@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "site": {
+      "title": "Network Site",
+      "description": "Represents a BTS/eNodeB network site and its technical details.",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string" },
+        "name": { "type": "string" },
+        "admin": {
+          "type": "object",
+          "properties": {
+            "province": { "type": "string" },
+            "zone": { "type": "string" },
+            "district": { "type": "string" },
+            "localLevel": { "type": "string" }
+          }
+        },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Maintenance", "Decommissioned", "Planned", "Surveyed"] },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "technologies": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "array", "items": { "type": "string" } },
+            "lteType": { "type": "array", "items": { "type": "string" } },
+            "lte1800RRU": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "tower": {
+          "type": "object",
+          "properties": {
+            "height": { "type": "string" },
+            "type": { "type": "string" },
+            "owner": { "type": "string" },
+            "foundation": { "type": "string" }
+          }
+        },
+        "power": {
+          "type": "object",
+          "properties": {
+            "source": { "type": "string" },
+            "sourceType": { "type": "string" },
+            "backupDG": { "type": "string" },
+            "backupDGCapacity": { "type": "string" },
+            "batteryType": { "type": "string" },
+            "batteryCapacity": { "type": "string" },
+            "batteryBanks": { "type": "string" },
+            "rectifierVendor": { "type": "string" },
+            "rectifierCapacity": { "type": "string" },
+            "solarCapacity": { "type": "string" },
+            "batteryHealth": { "type": "number" },
+            "fuelLevel": { "type": "number" },
+            "currentLoad": { "type": "string" }
+          }
+        },
+        "transmission": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "bandwidthCapacity": { "type": "string" },
+            "vendor": { "type": "string" },
+            "path": { "type": "string" },
+            "interface": { "type": "string" },
+            "indoorTransEquipmentType": { "type": "string" },
+            "indoorTransEquipmentname": { "type": "string" },
+            "indoorTransEquipmentVendor": { "type": "string" }
+          }
+        },
+        "hubSite": { "type": "string", "enum": ["Yes", "No"] },
+        "parentSite": { "type": "string" },
+        "shelterType": { "type": "string" },
+        "owner": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "contact": { "type": "string" },
+            "type": { "type": "string" },
+            "accessCode": { "type": "string" }
+          }
+        },
+        "leaseContract": {
+          "type": "object",
+          "properties": {
+            "Date": { "type": "string" },
+            "renewalOnYears": { "type": "string" },
+            "renewalPercent": { "type": "string" }
+          }
+        },
+        "engineer": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" },
+            "employeeId": { "type": "string" },
+            "shift": { "type": "string" }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "temp": { "type": "number" },
+            "humidity": { "type": "number" },
+            "smokeDetector": { "type": "boolean" },
+            "doorOpen": { "type": "boolean" }
+          }
+        },
+        "alarms": { "type": "array", "items": { "type": "string" } },
+        "lastAudit": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["siteId", "name", "status"]
+    },
+    "userProfile": {
+      "title": "User Profile",
+      "description": "User account information and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "editor", "viewer"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "complaint": {
+      "title": "Network Complaint",
+      "description": "Represents a network performance issue or service complaint.",
+      "type": "object",
+      "properties": {
+        "ticketNumber": { "type": "string" },
+        "complaintName": { "type": "string" },
+        "complainerName": { "type": "string" },
+        "complainerContact": { "type": "string" },
+        "province": { "type": "string" },
+        "zone": { "type": "string" },
+        "district": { "type": "string" },
+        "localLevel": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "siteId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "Resolved", "In Progress"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ticketNumber", "complaintName", "status"]
+    }
+  },
+  "firestore": {
+    "/sites/{siteId}": {
+      "schema": "site",
+      "description": "Collection of all network sites."
+    },
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Collection of user roles and profiles."
+    },
+    "/complaints/{complaintId}": {
+      "schema": "complaint",
+      "description": "Collection of network service complaints and history logs."
+    }
+  }
+}
