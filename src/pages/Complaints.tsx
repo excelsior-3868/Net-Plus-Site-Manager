@@ -38,12 +38,8 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   }, [provinceParam]);
 
   useEffect(() => {
-    const unsubscribeComplaints = getComplaints(setComplaints);
-    const unsubscribeSites = getSites(setSites);
-    return () => {
-      unsubscribeComplaints();
-      unsubscribeSites();
-    };
+    getComplaints(setComplaints);
+    getSites(setSites);
   }, []);
 
   const filteredComplaints = useMemo(() => {

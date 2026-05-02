@@ -34,12 +34,8 @@ const ComplaintMap: React.FC<{ profile: UserProfile | null }> = ({ profile }) =>
     const siteId = searchParams.get('siteId');
 
     useEffect(() => {
-        const unsubSites = getSites(setSites);
-        const unsubComplaints = getComplaints(setComplaints);
-        return () => {
-          unsubSites();
-          unsubComplaints();
-        };
+        getSites(setSites);
+        getComplaints(setComplaints);
     }, []);
     
 

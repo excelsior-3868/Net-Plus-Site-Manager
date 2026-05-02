@@ -139,12 +139,8 @@ export default function Sites({ profile }: SitesProps) {
   }, [filteredSites, isTransmissionView]);
 
   useEffect(() => {
-    const unsubscribeSites = getSites(setSites);
-    const unsubscribeComplaints = getComplaints(setComplaints);
-    return () => {
-      unsubscribeSites();
-      unsubscribeComplaints();
-    };
+    getSites(setSites);
+    getComplaints(setComplaints);
   }, []);
 
   useEffect(() => {

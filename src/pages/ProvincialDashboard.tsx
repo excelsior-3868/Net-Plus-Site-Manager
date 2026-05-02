@@ -56,18 +56,11 @@ export default function ProvincialDashboard({ profile }: { profile: UserProfile 
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubSites = getSites((data) => {
+    getComplaints(setComplaints);
+    getSites((data) => {
       setSites(data);
-    });
-    const unsubComplaints = getComplaints((data) => {
-      setComplaints(data);
       setLoading(false);
     });
-
-    return () => {
-      unsubSites();
-      unsubComplaints();
-    };
   }, []);
 
   const provincialStats = useMemo(() => {
