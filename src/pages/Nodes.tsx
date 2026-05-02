@@ -150,80 +150,66 @@ export default function Sites({ profile }: SitesProps) {
   }, [provinceParam]);
 
   const handleExport = () => {
-    const dataToExport = filteredSites.map(s => ({
-      'Node ID': s.siteId,
-      'Site Name': s.name,
-      'Status': s.status,
-      'Province': s.admin?.province || '',
-      'Zone': s.admin?.zone || '',
-      'District': s.admin?.district || '',
-      'Local Level': s.admin?.localLevel || '',
-      'Coordinates': `${s.lat}, ${s.lng}`,
-      'Technologies': (s.technologies?.type || []).join(', '),
-      'LTE Bands': (s.technologies?.lteType || []).join(', '),
-      'LTE RRU Config': (s.technologies?.lte1800RRU || []).join(', '),
-      'Tower Height': s.tower?.height || '',
-      'Tower Type': s.tower?.type || '',
-      'Tower Owner': s.tower?.owner || '',
-      'Tower Foundation': s.tower?.foundation || '',
-      'Power Source': Array.isArray(s.power?.source) ? s.power.source.join(', ') : s.power?.source || '',
-      'Power Source Type': s.power?.sourceType || '',
-      'Backup DG': s.power?.backupDG || '',
-      'DG Capacity': s.power?.backupDGCapacity || '',
-      'Battery Type': s.power?.batteryType || '',
-      'Battery Capacity': s.power?.batteryCapacity || '',
-      'Battery Banks': s.power?.batteryBanks || '',
-      'Rectifier Vendor': s.power?.rectifierVendor || '',
-      'Rectifier Capacity': s.power?.rectifierCapacity || '',
-      'Solar Capacity': s.power?.solarCapacity || '',
-      'Battery Health (%)': s.power?.batteryHealth || '',
-      'Fuel Level (%)': s.power?.fuelLevel || '',
-      'Current Load': s.power?.currentLoad || '',
-      'Trans Type': s.transmission?.type || '',
-      'Bandwidth': s.transmission?.bandwidthCapacity || '',
-      'Trans Vendor': s.transmission?.vendor || '',
-      'Trans Path': s.transmission?.path || '',
-      'Trans Interface': s.transmission?.interface || '',
-      'Indoor Trans Type': s.transmission?.indoorTransEquipmentType || '',
-      'Indoor Trans Name': s.transmission?.indoorTransEquipmentname || '',
-      'Indoor Trans Vendor': s.transmission?.indoorTransEquipmentVendor || '',
-      'Indoor Trans Type 2': (s.transmission as any)?.indoorTransEquipmentType2 || '',
-      'Indoor Trans Name 2': (s.transmission as any)?.indoorTransEquipmentname2 || '',
-      'Indoor Trans Vendor 2': (s.transmission as any)?.indoorTransEquipmentVendor2 || '',
-      'Hub Site': s.hubSite || '',
-      'Parent Site': s.parentSite || '',
-      'Shelter Type': s.shelterType || '',
-      'Owner Name': s.owner?.name || '',
-      'Owner Contact': s.owner?.contact || '',
-      'Owner Type': s.owner?.type || '',
-      'Access Code': s.owner?.accessCode || '',
-      'Lease Date': s.leaseContract?.Date || '',
-      'Renewal Years': s.leaseContract?.renewalOnYears || '',
-      'Renewal Percent': s.leaseContract?.renewalPercent || '',
-      'Engineer Name': s.engineer?.name || '',
-      'Engineer Phone': s.engineer?.phone || '',
-      'Employee ID': s.engineer?.employeeId || '',
-      'Engineer Shift': s.engineer?.shift || '',
-      'Temp (C)': s.environment?.temp || '',
-      'Humidity (%)': s.environment?.humidity || '',
-      'Smoke Detector': s.environment?.smokeDetector ? 'Yes' : 'No',
-      'Door Open': s.environment?.doorOpen ? 'Yes' : 'No',
-      'Active Alarms': (s.alarms || []).join(', '),
-      'Last Audit': s.lastAudit || ''
-    }));
+    // If no data, provide a template row
+    const exportData = filteredSites.length > 0 ? filteredSites.map(s => ({
+      site_id: s.siteId,
+      name: s.name,
+      status: s.status,
+      province: s.admin?.province || (s as any).province || '',
+      zone: s.admin?.zone || (s as any).zone || '',
+      district: s.admin?.district || (s as any).district || '',
+      local_level: s.admin?.localLevel || (s as any).local_level || '',
+      lat: s.lat,
+      lng: s.lng,
+      technologies: JSON.stringify(s.technologies),
+      tower: JSON.stringify(s.tower),
+      power: JSON.stringify(s.power),
+      transmission: JSON.stringify(s.transmission),
+      hub_site: s.hubSite ? 'Yes' : 'No',
+      parent_site: s.parentSite || '',
+      shelter_type: s.shelterType || '',
+      owner_info: JSON.stringify(s.owner),
+      lease_contract: JSON.stringify(s.leaseContract),
+      engineer_info: JSON.stringify(s.engineer),
+      environment: JSON.stringify(s.environment),
+      alarms: JSON.stringify(s.alarms),
+      last_audit: s.lastAudit || ''
+    })) : [{
+      site_id: 'TEMPLATE_ID',
+      name: 'Sample Name',
+      status: 'Active',
+      province: 'Bagmati',
+      zone: 'Bagmati',
+      district: 'Kathmandu',
+      local_level: 'KMC',
+      lat: 27.7172,
+      lng: 85.3240,
+      technologies: '{"type": ["2G", "4G"]}',
+      tower: '{"height": "30m", "type": "Roof Top"}',
+      power: '{"source": ["Solar", "NEA"]}',
+      transmission: '{"type": "Microwave"}',
+      hub_site: 'No',
+      parent_site: '',
+      shelter_type: 'Indoor',
+      owner_info: '{"name": "Internal"}',
+      lease_contract: '{}',
+      engineer_info: '{}',
+      environment: '{}',
+      alarms: '[]',
+      last_audit: ''
+    }];
     
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "NTC_Nodes");
-    XLSX.writeFile(wb, `ntc_nodes_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `ntc_inventory_template.xlsx`);
   };
 
   const handleBulkImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Confirm Bulk Data Injection: Are you sure you want to commit multiple records to the production database?")) return;
-
+    if (!window.confirm("Confirm Bulk Data Injection: Are you sure you want to commit these records to the database?")) return;
     if (!profile) return;
 
     const reader = new FileReader();
@@ -231,118 +217,56 @@ export default function Sites({ profile }: SitesProps) {
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
+        const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         const importPromises = data.map(row => {
-          // Parse coordinates if available in "Lat, Lng" format
-          let lat = 0;
-          let lng = 0;
-          if (row['Coordinates']) {
-            const coords = String(row['Coordinates']).split(',');
-            if (coords.length === 2) {
-              lat = parseFloat(coords[0].trim()) || 0;
-              lng = parseFloat(coords[1].trim()) || 0;
-            }
-          } else {
-            lat = parseFloat(row['Latitude'] || row['lat'] || '0');
-            lng = parseFloat(row['Longitude'] || row['lng'] || '0');
-          }
+          const tryParse = (val: any) => {
+             if (!val) return {};
+             try { return typeof val === 'string' ? JSON.parse(val) : val; } 
+             catch(e) { return {}; }
+          };
 
           const newSite: Partial<Site> = {
-            siteId: String(row['Node ID'] || row['siteId'] || ''),
-            name: String(row['Site Name'] || row['name'] || ''),
-            status: (row['Status'] || row['status'] || 'Planned') as any,
-            lat,
-            lng,
+            siteId: String(row.site_id || ''),
+            name: String(row.name || ''),
+            status: (row.status || 'Planned') as any,
+            lat: parseFloat(row.lat) || 0,
+            lng: parseFloat(row.lng) || 0,
+            province: String(row.province || ''),
+            zone: String(row.zone || ''),
+            district: String(row.district || ''),
+            localLevel: String(row.local_level || ''),
             admin: {
-              province: String(row['Province'] || row['province'] || ''),
-              zone: String(row['Zone'] || row['zone'] || ''),
-              district: String(row['District'] || row['district'] || ''),
-              localLevel: String(row['Local Level'] || row['localLevel'] || ''),
+              province: String(row.province || ''),
+              zone: String(row.zone || ''),
+              district: String(row.district || ''),
+              localLevel: String(row.local_level || ''),
             },
-            technologies: {
-              type: String(row['Technologies'] || '').split(',').map(s => s.trim()).filter(Boolean),
-              lteType: String(row['LTE Bands'] || '').split(',').map(s => s.trim()).filter(Boolean),
-              lte1800RRU: String(row['LTE RRU Config'] || '').split(',').map(s => s.trim()).filter(Boolean),
-            },
-            tower: { 
-              height: String(row['Tower Height'] || ''), 
-              type: String(row['Tower Type'] || ''), 
-              owner: String(row['Tower Owner'] || ''), 
-              foundation: String(row['Tower Foundation'] || '') 
-            },
-            power: { 
-              source: String(row['Power Source'] || '').split(',').map(s => s.trim()).filter(Boolean),
-              sourceType: String(row['Power Source Type'] || ''),
-              backupDG: String(row['Backup DG'] || 'No'), 
-              backupDGCapacity: String(row['DG Capacity'] || ''), 
-              batteryType: String(row['Battery Type'] || ''), 
-              batteryCapacity: String(row['Battery Capacity'] || ''), 
-              batteryBanks: String(row['Battery Banks'] || ''), 
-              rectifierVendor: String(row['Rectifier Vendor'] || ''), 
-              rectifierCapacity: String(row['Rectifier Capacity'] || ''), 
-              solarCapacity: String(row['Solar Capacity'] || ''), 
-              batteryHealth: parseInt(String(row['Battery Health (%)'] || '100')), 
-              fuelLevel: parseInt(String(row['Fuel Level (%)'] || '100')), 
-              currentLoad: String(row['Current Load'] || '') 
-            },
-            transmission: { 
-              type: String(row['Trans Type'] || ''), 
-              bandwidthCapacity: String(row['Bandwidth'] || ''), 
-              vendor: String(row['Trans Vendor'] || ''), 
-              path: String(row['Trans Path'] || ''), 
-              interface: String(row['Trans Interface'] || ''), 
-              indoorTransEquipmentType: String(row['Indoor Trans Type'] || ''), 
-              indoorTransEquipmentname: String(row['Indoor Trans Name'] || ''), 
-              indoorTransEquipmentVendor: String(row['Indoor Trans Vendor'] || ''),
-              indoorTransEquipmentType2: String(row['Indoor Trans Type 2'] || ''),
-              indoorTransEquipmentname2: String(row['Indoor Trans Name 2'] || ''),
-              indoorTransEquipmentVendor2: String(row['Indoor Trans Vendor 2'] || ''),
-            },
-            hubSite: (row['Hub Site'] || 'No') as 'Yes' | 'No',
-            parentSite: String(row['Parent Site'] || ''),
-            shelterType: String(row['Shelter Type'] || ''),
-            owner: { 
-              name: String(row['Owner Name'] || ''), 
-              contact: String(row['Owner Contact'] || ''), 
-              type: String(row['Owner Type'] || 'Internal'), 
-              accessCode: String(row['Access Code'] || '') 
-            },
-            leaseContract: { 
-              Date: String(row['Lease Date'] || ''), 
-              renewalOnYears: String(row['Renewal Years'] || ''), 
-              renewalPercent: String(row['Renewal Percent'] || '') 
-            },
-            engineer: { 
-              name: String(row['Engineer Name'] || ''), 
-              phone: String(row['Engineer Phone'] || ''), 
-              employeeId: String(row['Employee ID'] || ''), 
-              shift: String(row['Engineer Shift'] || 'Alpha') 
-            },
-            environment: { 
-              temp: parseFloat(String(row['Temp (C)'] || '25')), 
-              humidity: parseFloat(String(row['Humidity (%)'] || '50')), 
-              smokeDetector: String(row['Smoke Detector'] || '').toLowerCase() === 'yes', 
-              doorOpen: String(row['Door Open'] || '').toLowerCase() === 'yes' 
-            },
-            alarms: String(row['Active Alarms'] || '').split(',').map(s => s.trim()).filter(Boolean),
-            lastAudit: String(row['Last Audit'] || new Date().toISOString().split('T')[0]),
-            lastAuditDate: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            updatedByUserId: profile.uid,
-            updatedByUserName: profile.name,
+            technologies: tryParse(row.technologies),
+            tower: tryParse(row.tower),
+            power: tryParse(row.power),
+            transmission: tryParse(row.transmission),
+            hubSite: (row.hub_site === 'Yes' || row.hub_site === true) ? 'Yes' : 'No',
+            parentSite: String(row.parent_site || ''),
+            shelterType: String(row.shelter_type || ''),
+            owner: tryParse(row.owner_info),
+            leaseContract: tryParse(row.lease_contract),
+            engineer: tryParse(row.engineer_info),
+            environment: tryParse(row.environment),
+            alarms: tryParse(row.alarms),
+            lastAudit: String(row.last_audit || ''),
+            updatedBy: profile.name
           };
           return createSite(newSite);
         });
 
         await Promise.all(importPromises);
-        alert(`Successfully provisioned ${data.length} records into the system.`);
+        alert(`Successfully imported ${data.length} records.`);
+        getSites(setSites); // Refresh the list
       } catch (error) {
         console.error("Bulk import failed", error);
-        alert("System Error: Bulk data injection failed. Check console for details.");
+        alert("Import failed. Ensure JSON columns are valid.");
       }
     };
     reader.readAsBinaryString(file);
