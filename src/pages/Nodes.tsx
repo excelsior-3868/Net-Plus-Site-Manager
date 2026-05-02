@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   AlertCircle,
   Cpu,
-  Database
+  Database,
+  FileText
 } from 'lucide-react';
 import { Site, UserProfile, Complaint } from '../types';
 import { getSites, deleteSite, createSite } from '../services/siteService';
@@ -148,6 +149,41 @@ export default function Sites({ profile }: SitesProps) {
       setFilterProvince(provinceParam);
     }
   }, [provinceParam]);
+
+  const handleGenerateReport = () => {
+    if (filteredSites.length === 0) {
+      alert("No data available to generate a report.");
+      return;
+    }
+
+    const reportData = filteredSites.map(s => ({
+      'Site ID': s.siteId,
+      'Site Name': s.name,
+      'Operational Status': s.status,
+      'Region': s.admin?.province || '',
+      'Zone': s.admin?.zone || '',
+      'District': s.admin?.district || '',
+      'Municipality/Local Level': s.admin?.localLevel || '',
+      'Latitude': s.lat,
+      'Longitude': s.lng,
+      'Technologies': (s.technologies?.type || []).join(', '),
+      'Tower Type': s.tower?.type || '',
+      'Tower Height': s.tower?.height || '',
+      'Power Source': Array.isArray(s.power?.source) ? s.power.source.join(', ') : s.power?.source || '',
+      'Battery Health (%)': s.power?.batteryHealth || '',
+      'Transmission Type': s.transmission?.type || '',
+      'Bandwidth Capacity': s.transmission?.bandwidthCapacity || '',
+      'Primary Gear': `${s.transmission?.indoorTransEquipmentVendor || ''} ${s.transmission?.indoorTransEquipmentname || ''}`,
+      'Responsible Engineer': s.engineer?.name || '',
+      'Engineer Contact': s.engineer?.phone || '',
+      'Last Audit Date': s.lastAudit || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(reportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Infrastructure_Report");
+    XLSX.writeFile(wb, `ntc_network_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   const handleExport = () => {
     // If no data, provide a template row
@@ -389,6 +425,13 @@ export default function Sites({ profile }: SitesProps) {
               Reset Filters
             </button>
           )}
+          <button 
+            onClick={handleGenerateReport}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
+          >
+            <FileText size={16} className="text-ntc-blue" />
+            <span>Generate Report</span>
+          </button>
           <button 
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
