@@ -127,6 +127,38 @@ app.get('/api/sites/:siteId/complaints', async (req, res) => {
   }
 });
 
+// Users API
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.put('/api/users/:uid', async (req, res) => {
+  const { role } = req.body;
+  try {
+    await query('UPDATE users SET role = $1 WHERE uid = $2', [role, req.params.uid]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/users/:uid', async (req, res) => {
+  try {
+    await query('DELETE FROM users WHERE uid = $1', [req.params.uid]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Catch-all to serve React Router routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));

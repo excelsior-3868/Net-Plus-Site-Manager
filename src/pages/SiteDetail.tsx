@@ -60,12 +60,9 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
   }, [id]);
 
   useEffect(() => {
-    // Subscribe to complaints for this site
-    // We prioritize site.siteId but fallback to doc id
     const targetId = site?.siteId || id;
     if (targetId) {
-       const unsubscribe = getSiteComplaints(targetId, setComplaints);
-       return () => unsubscribe();
+       getSiteComplaints(targetId, setComplaints);
     }
   }, [id, site?.siteId]);
 
@@ -520,7 +517,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                       <div className="flex items-center gap-4 mt-2">
                         <div className="flex items-center gap-1 text-[10px] font-bold text-ntc-blue/30 uppercase tracking-tighter">
                           <Calendar size={10} />
-                          {c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'}
                         </div>
                         {c.siteId && (
                            <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500/60 uppercase tracking-tighter">

@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
 import { UserProfile, UserRole } from '../types';
-import { cn, handleFirestoreError, OperationType } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { Shield, ShieldAlert, ShieldCheck, Trash2, Mail, Calendar, User as UserIcon } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getCurrentUser } from '../services/authService';
+
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api';
 
 export default function Users() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentUser = getCurrentUser();
 
   useEffect(() => {
     loadUsers();
@@ -17,11 +19,11 @@ export default function Users() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const userData = querySnapshot.docs.map(doc => doc.data() as UserProfile);
-      setUsers(userData);
+      const response = await fetch(`${API_URL}/users`);
+      const data = await response.json();
+      setUsers(data);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'users', auth);
+      console.error('Error loading users:', error);
     } finally {
       setLoading(false);
     }
@@ -29,25 +31,28 @@ export default function Users() {
 
   const updateRole = async (uid: string, role: UserRole) => {
     try {
-      const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role });
+      await fetch(`${API_URL}/users/${uid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role })
+      });
       setUsers(users.map(u => u.uid === uid ? { ...u, role } : u));
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`, auth);
+      console.error('Error updating role:', error);
     }
   };
 
   const deleteUser = async (uid: string) => {
-    if (uid === auth.currentUser?.uid) {
+    if (uid === currentUser?.uid) {
       alert("You cannot delete your own account.");
       return;
     }
     if (window.confirm('Remove this user access?')) {
       try {
-        await deleteDoc(doc(db, 'users', uid));
+        await fetch(`${API_URL}/users/${uid}`, { method: 'DELETE' });
         setUsers(users.filter(u => u.uid !== uid));
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `users/${uid}`, auth);
+        console.error('Error deleting user:', error);
       }
     }
   };
@@ -91,7 +96,7 @@ export default function Users() {
                     <select 
                       value={user.role}
                       onChange={(e) => updateRole(user.uid, e.target.value as UserRole)}
-                      disabled={user.uid === auth.currentUser?.uid}
+                      disabled={user.uid === currentUser?.uid}
                       className={cn(
                         "rounded-lg border border-ntc-blue/10 bg-transparent px-3 py-1.5 text-xs font-bold uppercase tracking-wider outline-none transition-all focus:ring-2 focus:ring-ntc-blue/10",
                         user.role === 'superadmin' ? "text-purple-600 font-black" : user.role === 'admin' ? "text-indigo-600" : user.role === 'editor' ? "text-blue-600" : "text-ntc-blue/60"
