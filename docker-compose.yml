@@ -6,8 +6,8 @@ services:
     container_name: netplus-db
     restart: always
     environment:
-      - POSTGRES_DB=NetPlusSiteManager
-      - POSTGRES_USER=postgres
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "5432:5432"  # Exposed for DBeaver access
@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d NetPlusSiteManager"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,12 +28,12 @@ services:
     container_name: netplus-manager
     restart: always
     ports:
-      - "8081:5000"  # Application port changed to 8081
+      - "8081:5000"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/NetPlusSiteManager
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - PORT=5000
     logging:
       driver: "json-file"

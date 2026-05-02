@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-#  NetPlus Manager — Docker Deployment (Port 8081 + DB Expose)
+#  NetPlus Manager — Docker Deployment (Environment-Driven)
 #  Usage: bash deploy.sh
 # =============================================================================
 
@@ -9,6 +9,10 @@ set -e
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/excelsior-3868/Net-Plus-Site-Manager.git"
 APP_DIR="/var/www/netplus"
+
+# Database Defaults
+DB_NAME="NetPlusSiteManager"
+DB_USER="postgres"
 DB_PASSWORD="S@bin@29935"
 
 # Text formatting
@@ -50,15 +54,16 @@ fi
 header "Step 2 — Configure Environment"
 cat > "$APP_DIR/.env" <<EOF
 APP_DOMAIN=${APP_DOMAIN}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 EOF
-success ".env file generated"
+success ".env file generated with all DB configurations"
 
 # ─── STEP 3: DEPLOY WITH DOCKER COMPOSE ───────────────────────────────────────
 header "Step 3 — Deploying Containers"
 cd "$APP_DIR"
 
-# Try 'docker compose' then 'docker-compose'
 if docker compose version &>/dev/null; then
     COMPOSE_CMD="docker compose"
 else
@@ -81,8 +86,8 @@ fi
 # ─── SUMMARY ──────────────────────────────────────────────────────────────────
 header "Deployment Complete"
 echo -e "  🌐  NetPlus URL:    ${CYAN}http://${APP_DOMAIN}:8081${NC}"
-echo -e "  🐘  Postgres DB:    ${CYAN}NetPlusSiteManager${NC}"
-echo -e "  👤  DB Username:    ${CYAN}postgres${NC}"
+echo -e "  🐘  Postgres DB:    ${CYAN}${DB_NAME}${NC}"
+echo -e "  👤  DB Username:    ${CYAN}${DB_USER}${NC}"
 echo -e "  🔑  DB Password:    ${CYAN}${DB_PASSWORD}${NC}"
 echo -e "  📡  DBeaver Access: ${CYAN}${APP_DOMAIN}:5432${NC}"
 echo ""
