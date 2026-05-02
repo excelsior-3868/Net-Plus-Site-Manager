@@ -46,6 +46,19 @@ const mapSite = (row: any) => ({
   updatedBy: row.updated_by
 });
 
+// Auth API (Mock for now)
+app.post('/api/login', (req, res) => {
+  // Simple mock login - in a real app, verify against DB
+  const { email } = req.body;
+  res.json({
+    uid: 'admin-123',
+    email: email || 'admin@netplus.com',
+    name: 'System Administrator',
+    role: 'admin',
+    active: true
+  });
+});
+
 // Sites API
 app.get('/api/sites', async (req, res) => {
   try {

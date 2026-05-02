@@ -14,18 +14,16 @@ import {
   Cpu,
   Database
 } from 'lucide-react';
-import { User } from 'firebase/auth';
 import { UserProfile } from '../types';
-import { logOut } from '../lib/firebase';
+import { logout } from '../services/authService';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 
 interface LayoutProps {
-  user: User;
   profile: UserProfile | null;
 }
 
-export default function Layout({ user, profile }: LayoutProps) {
+export default function Layout({ profile }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -40,9 +38,8 @@ export default function Layout({ user, profile }: LayoutProps) {
     { label: 'Authorized Users', icon: Users, path: '/users', role: 'admin' },
   ];
 
-  const handleLogout = async () => {
-    await logOut();
-    navigate('/login');
+  const handleLogout = () => {
+    logout();
   };
 
   return (
@@ -114,7 +111,7 @@ export default function Layout({ user, profile }: LayoutProps) {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-[10px] font-bold text-ntc-blue">{profile?.name || user.email}</p>
+                    <p className="truncate text-[10px] font-bold text-ntc-blue">{profile?.name || profile?.email || 'User'}</p>
                     <p className="text-[8px] font-bold uppercase tracking-widest text-ntc-blue/60">{profile?.role || 'Guest'}</p>
                   </div>
                 </div>

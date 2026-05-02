@@ -1,10 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from './lib/firebase';
-import { subscribeToUserProfile, syncUserProfile } from './services/authService';
+import { getCurrentUser } from './services/authService';
 import { UserProfile } from './types';
-import { seedInitialData } from './lib/seed';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -18,33 +15,13 @@ import SiteDetail from './pages/SiteDetail';
 import Layout from './components/Layout';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubProfile: (() => void) | undefined;
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        await syncUserProfile(user);
-        await seedInitialData();
-        unsubProfile = subscribeToUserProfile(user.uid, (p) => {
-          setProfile(p);
-          setLoading(false);
-        });
-      } else {
-        if (unsubProfile) unsubProfile();
-        setProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      if (unsubProfile) unsubProfile();
-    };
+    const user = getCurrentUser();
+    setProfile(user);
+    setLoading(false);
   }, []);
 
   if (loading) {
@@ -61,9 +38,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
+        <Route path="/login" element={!profile ? <Login /> : <Navigate to="/" replace />} />
         
-        <Route element={user ? <Layout user={user} profile={profile} /> : <Navigate to="/login" replace />}>
+        <Route element={profile ? <Layout profile={profile} /> : <Navigate to="/login" replace />}>
           <Route path="/" element={<Dashboard profile={profile} />} />
           <Route path="/provincial" element={<ProvincialDashboard profile={profile} />} />
           <Route path="/transmission-registry" element={<Nodes profile={profile} />} />

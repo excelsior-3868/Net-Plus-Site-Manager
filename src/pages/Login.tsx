@@ -1,15 +1,18 @@
 import { motion } from 'motion/react';
 import { LogIn, Radio } from 'lucide-react';
-import { signInWithGoogle } from '../lib/firebase';
+import { login } from '../services/authService';
 import { useState } from 'react';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     try {
-      await signInWithGoogle();
+      await login(email || 'admin@netplus.com');
+      window.location.reload();
     } catch (error) {
       console.error(error);
       setLoading(false);
@@ -43,22 +46,36 @@ export default function Login() {
             <p className="mt-2 text-sm text-ntc-blue/60">Sign in to manage your network infrastructure.</p>
           </div>
 
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-ntc-blue py-4 text-sm font-medium text-white transition-all hover:bg-ntc-blue-dark active:scale-[0.98] disabled:opacity-50"
-          >
-            {loading ? (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <>
-                <LogIn size={18} />
-                <span>Continue with Google</span>
-              </>
-            )}
-            
-            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
-          </button>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono uppercase tracking-widest opacity-40">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@netplus.com"
+                className="w-full rounded-xl border border-ntc-blue/10 bg-gray-50 px-4 py-3 text-sm focus:border-ntc-blue focus:outline-none"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-ntc-blue py-4 text-sm font-medium text-white transition-all hover:bg-ntc-blue-dark active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <>
+                  <LogIn size={18} />
+                  <span>Sign In to Dashboard</span>
+                </>
+              )}
+              
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
+            </button>
+          </form>
 
           <div className="mt-8 border-t border-ntc-blue/5 pt-8">
             <div className="grid grid-cols-2 gap-4">
