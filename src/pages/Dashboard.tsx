@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { getSites } from '../services/siteService';
 import { getComplaints } from '../services/complaintService';
-import { seedInitialData } from '../lib/seed';
 import { cn } from '../lib/utils';
 import { Complaint, Site, UserProfile } from '../types';
 
@@ -44,13 +43,8 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [selectedProvince, setSelectedProvince] = useState('All');
 
   useEffect(() => {
-    seedInitialData();
-    const unsubscribeSites = getSites(setSites);
-    const unsubscribeComplaints = getComplaints(setComplaints);
-    return () => {
-      unsubscribeSites();
-      unsubscribeComplaints();
-    };
+    getSites(setSites);
+    getComplaints(setComplaints);
   }, []);
 
   const filteredSites = useMemo(() => {
