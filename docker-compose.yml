@@ -1,25 +1,6 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: netplus-db
-    restart: always
-    environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    ports:
-      - "5432:5432"  # Exposed for DBeaver access
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   app:
     build:
       context: .
@@ -29,9 +10,6 @@ services:
     restart: always
     ports:
       - "8081:5000"
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}
       - DB_USER=${DB_USER}
@@ -45,6 +23,3 @@ services:
       options:
         max-size: "10mb"
         max-file: "3"
-
-volumes:
-  postgres_data:
