@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { 
   ChevronLeft, 
@@ -34,8 +34,12 @@ const ComplaintMap: React.FC<{ profile: UserProfile | null }> = ({ profile }) =>
     const siteId = searchParams.get('siteId');
 
     useEffect(() => {
-        getSites(setSites);
-        getComplaints(setComplaints);
+        const unsubSites = getSites(setSites);
+        const unsubComplaints = getComplaints(setComplaints);
+        return () => {
+          unsubSites();
+          unsubComplaints();
+        };
     }, []);
     
 
@@ -109,11 +113,7 @@ const ComplaintMap: React.FC<{ profile: UserProfile | null }> = ({ profile }) =>
                                 </div>
                                 <div className="flex justify-between text-[11px]">
                                     <span className="text-gray-500">Technology</span>
-                                    <span className="font-bold text-ntc-blue">
-                                        {Array.isArray(targetSite.technologies) 
-                                            ? targetSite.technologies.join(', ') 
-                                            : (targetSite.technologies?.type?.join(', ') || 'N/A')}
-                                    </span>
+                                    <span className="font-bold text-ntc-blue">{targetSite.technologies.join(', ')}</span>
                                 </div>
                                 <Link to={`/sites/${targetSite.id}`} className="mt-3 block w-full py-2 text-center text-[10px] font-bold uppercase tracking-widest bg-white border border-indigo-100 rounded-xl text-ntc-blue hover:bg-ntc-blue hover:text-white transition-all">
                                     View Full Details
@@ -234,6 +234,33 @@ const ComplaintMap: React.FC<{ profile: UserProfile | null }> = ({ profile }) =>
                                 </Popup>
                             </Marker>
                         )}
+
+                        {selectedComplaint && selectedComplaint.nearestSites && selectedComplaint.nearestSites.map((ns, idx) => {
+                            const site = sites.find(s => s.siteId === ns.siteId);
+                            if (!site) return null;
+                            return (
+                                <React.Fragment key={`ns-${idx}`}>
+                                    <Marker position={[site.lat, site.lng]} icon={siteIcon}>
+                                        <Popup>
+                                            <div className="p-1">
+                                                <p className="text-[10px] font-bold text-indigo-600 uppercase mb-1">PROXIMITY SITE</p>
+                                                <p className="text-xs font-bold mb-1">{site.siteId}: {site.name}</p>
+                                                <p className="text-[10px] text-gray-500">{ns.distance.toFixed(2)} km from complaint</p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                    <Polyline 
+                                        positions={[[selectedComplaint.lat, selectedComplaint.lng], [site.lat, site.lng]]}
+                                        pathOptions={{ 
+                                            color: '#6366f1', 
+                                            dashArray: '5, 10', 
+                                            weight: 2,
+                                            opacity: 0.6
+                                        }}
+                                    />
+                                </React.Fragment>
+                            );
+                        })}
 
                         {filteredComplaints.map((c, idx) => (
                             <Marker 

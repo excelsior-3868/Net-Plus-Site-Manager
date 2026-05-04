@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { Site, UserProfile } from '../types';
-import { getSite, deleteSite } from '../services/siteService';
+import { getSite, deleteSite, subscribeToSite } from '../services/siteService';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -33,7 +33,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
-  const [initialModalTab, setInitialModalTab] = useState<'general' | 'technical' | 'infrastructure' | 'contact'>('general');
+  const [initialModalTab, setInitialModalTab] = useState<'general' | 'technical' | 'power' | 'transmission' | 'infrastructure' | 'contact'>('general');
   const [isComplaintModalOpen, setComplaintModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('Active');
   const [editingComplaint, setEditingComplaint] = useState<Complaint | undefined>(undefined);
@@ -56,14 +56,22 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
   useEffect(() => {
     if (id) {
-      loadSite();
+      setLoading(true);
+      const unsubscribe = subscribeToSite(id, (data) => {
+        setSite(data);
+        setLoading(false);
+      });
+      return () => unsubscribe();
     }
   }, [id]);
 
   useEffect(() => {
+    // Subscribe to complaints for this site
+    // We prioritize site.siteId but fallback to doc id
     const targetId = site?.siteId || id;
     if (targetId) {
-       getSiteComplaints(targetId, setComplaints);
+       const unsubscribe = getSiteComplaints(targetId, setComplaints);
+       return () => unsubscribe();
     }
   }, [id, site?.siteId]);
 
@@ -75,13 +83,26 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
   };
 
   const handleConfirmDelete = async () => {
-    if (!site?.id) return;
-    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this asset record? This cannot be undone.")) {
+    if (!site?.id) {
+       alert("Target Identification Failure: Could not resolve the unique ID for this record.");
+       return;
+    }
+    
+    if (window.confirm("CRITICAL PROTOCOL: Are you sure you want to permanently DESTRUCT this asset record from the production registry? This action is irreversible.")) {
       try {
         await deleteSite(site.id);
+        alert("Success: Asset record has been purged from the database.");
         navigate('/nodes');
-      } catch (error) {
-        console.error("Delete failed", error);
+      } catch (error: any) {
+        console.error("Deletion execution failed:", error);
+        let errorMessage = "Check administrative authorization and connection stability.";
+        try {
+          const errStatus = error.message ? JSON.parse(error.message) : (typeof error === 'string' ? JSON.parse(error) : error);
+          errorMessage = errStatus.error || errorMessage;
+        } catch {
+          errorMessage = error.message || String(error);
+        }
+        alert(`Deletion Access Denied: ${errorMessage}`);
       }
     }
   };
@@ -185,14 +206,24 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
               </span>
               <div className="flex items-center gap-4">
               <span className="text-[10px] uppercase tracking-widest opacity-30">Node ID: {site.siteId}</span>
-              {site.updatedByUserName && (
+              {(site.updatedByUserName || site.lastAuditDate) && (
                 <div className="flex flex-col border-l border-ntc-blue/10 pl-4">
                   <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-ntc-blue/40 font-bold">
-                    <Users size={10} /> Last modified by: {site.updatedByUserName}
+                    <Users size={10} /> Last audit by: {site.updatedByUserName || 'System'}
                   </span>
-                  {site.updatedByUserId && (
-                    <span className="text-[8px] text-gray-300 font-mono tracking-tighter">ID: {site.updatedByUserId}</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest text-ntc-blue/30 font-bold">
+                      <History size={10} /> 
+                      {site.lastAuditDate?.seconds 
+                        ? new Date(site.lastAuditDate.seconds * 1000).toLocaleString() 
+                        : site.lastAuditDate instanceof Date 
+                          ? site.lastAuditDate.toLocaleString()
+                          : site.lastAudit || 'Recently'}
+                    </span>
+                    {site.updatedByUserId && (
+                      <span className="text-[8px] text-gray-300 font-mono tracking-tighter">ID: {site.updatedByUserId}</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -300,7 +331,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                      {canEdit && (
                        <button 
                          onClick={() => {
-                           setInitialModalTab('technical');
+                           setInitialModalTab('power');
                            setModalOpen(true);
                          }}
                          className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
@@ -343,7 +374,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                          </div>
                          <div className="text-right">
                             <p className="text-[10px] uppercase tracking-widest opacity-40">Last Audit Date</p>
-                            <p className="font-semibold">{site.lastAudit || 'N/A'}</p>
+                            <p className="font-semibold">{site.lastAuditDate?.seconds ? new Date(site.lastAuditDate.seconds * 1000).toLocaleDateString() : site.lastAudit || 'N/A'}</p>
                          </div>
                          <div className="col-span-2 pt-2 border-t border-ntc-blue/5">
                             <p className="text-[10px] uppercase tracking-widest opacity-40">Energy Storage Infrastructure</p>
@@ -377,7 +408,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                          </div>
                          <div>
                             <p className="text-[10px] uppercase tracking-widest opacity-40">Indoor Equipment</p>
-                            <p className="font-mono text-xs">{site.transmission?.indoorTransEquipmentName || 'N/A'}</p>
+                            <p className="font-mono text-xs">{site.transmission?.indoorTransEquipmentname || 'N/A'}</p>
                             <p className="text-[9px] opacity-40">Type: {site.transmission?.indoorTransEquipmentType || 'N/A'}</p>
                          </div>
                          <div className="text-right">
@@ -548,7 +579,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                       <div className="flex items-center gap-4 mt-2">
                         <div className="flex items-center gap-1 text-[10px] font-bold text-ntc-blue/30 uppercase tracking-tighter">
                           <Calendar size={10} />
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'}
+                          {c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                         </div>
                         {c.siteId && (
                            <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500/60 uppercase tracking-tighter">
@@ -571,7 +602,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
       <SiteFormModal 
         isOpen={isModalOpen} 
-        onClose={() => { setModalOpen(false); loadSite(); }} 
+        onClose={() => setModalOpen(false)} 
         initialData={site}
         profile={profile}
         initialTab={initialModalTab}

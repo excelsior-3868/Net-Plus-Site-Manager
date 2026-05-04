@@ -32,6 +32,11 @@ COPY server ./server
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=5000
+ENV DB_USER=netplususer
+ENV DB_HOST=10.26.192.126
+ENV DB_NAME=netplussitemanager
+ENV DB_PASSWORD=netplusUser12@%#
+ENV DB_PORT=5432
 
 # Expose the port
 EXPOSE 5000

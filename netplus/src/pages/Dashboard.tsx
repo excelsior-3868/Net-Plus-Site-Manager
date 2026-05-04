@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getSites } from '../services/siteService';
 import { getComplaints } from '../services/complaintService';
+import { seedInitialData } from '../lib/seed';
 import { cn } from '../lib/utils';
 import { Complaint, Site, UserProfile } from '../types';
 
@@ -43,8 +44,13 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [selectedProvince, setSelectedProvince] = useState('All');
 
   useEffect(() => {
-    getSites(setSites);
-    getComplaints(setComplaints);
+    seedInitialData();
+    const unsubscribeSites = getSites(setSites);
+    const unsubscribeComplaints = getComplaints(setComplaints);
+    return () => {
+      unsubscribeSites();
+      unsubscribeComplaints();
+    };
   }, []);
 
   const filteredSites = useMemo(() => {
@@ -65,20 +71,15 @@ export default function Dashboard({ profile }: DashboardProps) {
       const status = s.status;
       const tech = s.technologies;
       const techLength = Array.isArray(tech) ? tech.length : (tech?.type?.length || 0);
-      const isStatusProposed = status === 'Planned' || status === 'Surveyed';
-      const hasEquipment = techLength > 0;
-      // A site is proposed if it's explicitly planned/surveyed OR has no equipment installed and not in active ops
-      return isStatusProposed || (!hasEquipment && status !== 'Active' && status !== 'Maintenance');
+      return status === 'Planned' || status === 'Surveyed' || techLength === 0;
     });
 
+    // Physical sites must have equipment AND not be in the planned/surveyed phase
     const physicalSites = filteredSites.filter(s => {
       const status = s.status;
       const tech = s.technologies;
       const techLength = Array.isArray(tech) ? tech.length : (tech?.type?.length || 0);
-      const isStatusProposed = status === 'Planned' || status === 'Surveyed';
-      const hasEquipment = techLength > 0;
-      // Physical sites must have equipment AND not be in the planned/surveyed phase
-      return !isStatusProposed && hasEquipment;
+      return !['Planned', 'Surveyed'].includes(status) && techLength > 0;
     });
 
     const logical = physicalSites.reduce((acc, s) => {
@@ -131,8 +132,7 @@ export default function Dashboard({ profile }: DashboardProps) {
     const sitesWithComplaints = filteredComplaints
       .filter(c => (c.status === 'Open' || c.status === 'In Progress') && c.siteId)
       .reduce((acc, c) => {
-        // Look for site by siteId (NTC ID) or doc ID
-        const site = sites.find(s => s.siteId === c.siteId || s.id === c.siteId || String(s.id) === String(c.siteId));
+        const site = sites.find(s => s.siteId === c.siteId || s.id === c.siteId);
         if (site && !acc.find(s => s.id === site.id)) {
           acc.push(site);
         }

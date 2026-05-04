@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Cpu,
   Database,
-  FileText
+  Activity
 } from 'lucide-react';
 import { Site, UserProfile, Complaint } from '../types';
 import { getSites, deleteSite, createSite } from '../services/siteService';
@@ -69,7 +69,9 @@ export default function Sites({ profile }: SitesProps) {
       let matchesFilter = true;
       const tech = s.technologies;
       const techLength = Array.isArray(tech) ? tech.length : (tech?.type?.length || 0);
-      const isProposed = s.status === 'Planned' || s.status === 'Surveyed' || techLength === 0;
+      const isStatusProposed = s.status === 'Planned' || s.status === 'Surveyed';
+      const hasEquipment = techLength > 0;
+      const isProposed = isStatusProposed || (!hasEquipment && s.status !== 'Active' && s.status !== 'Maintenance');
 
       if (isSolarView || activeFilter === 'solar') {
         const sources = Array.isArray(s.power?.source) ? s.power.source : [String(s.power?.source || '')];
@@ -141,8 +143,12 @@ export default function Sites({ profile }: SitesProps) {
   }, [filteredSites, isTransmissionView]);
 
   useEffect(() => {
-    getSites(setSites);
-    getComplaints(setComplaints);
+    const unsubscribeSites = getSites(setSites);
+    const unsubscribeComplaints = getComplaints(setComplaints);
+    return () => {
+      unsubscribeSites();
+      unsubscribeComplaints();
+    };
   }, []);
 
   useEffect(() => {
@@ -151,135 +157,146 @@ export default function Sites({ profile }: SitesProps) {
     }
   }, [provinceParam]);
 
-  const handleGenerateReport = () => {
-    if (filteredSites.length === 0) {
-      alert("No data available to generate a report.");
-      return;
-    }
-
-    const reportData = filteredSites.map(s => ({
-      'Site ID': s.siteId,
+  const handleExport = () => {
+    const dataToExport = filteredSites.map(s => ({
+      'Node ID': s.siteId,
       'Site Name': s.name,
-      'Operational Status': s.status,
-      'Region': s.admin?.province || '',
+      'Status': s.status,
+      'Province': s.admin?.province || '',
       'Zone': s.admin?.zone || '',
       'District': s.admin?.district || '',
-      'Municipality/Local Level': s.admin?.localLevel || '',
-      'Latitude': s.lat,
-      'Longitude': s.lng,
+      'Local Level': s.admin?.localLevel || '',
+      'Coordinates': `${s.lat}, ${s.lng}`,
       'Technologies': (s.technologies?.type || []).join(', '),
-      'Tower Type': s.tower?.type || '',
+      'LTE Bands': (s.technologies?.lteType || []).join(', '),
+      'LTE RRU Config': (s.technologies?.lte1800RRU || []).join(', '),
       'Tower Height': s.tower?.height || '',
+      'Tower Type': s.tower?.type || '',
+      'Tower Owner': s.tower?.owner || '',
+      'Tower Foundation': s.tower?.foundation || '',
       'Power Source': Array.isArray(s.power?.source) ? s.power.source.join(', ') : s.power?.source || '',
+      'Power Source Type': s.power?.sourceType || '',
+      'Backup DG': s.power?.backupDG || '',
+      'DG Capacity': s.power?.backupDGCapacity || '',
+      'Battery Type': s.power?.batteryType || '',
+      'Battery Capacity': s.power?.batteryCapacity || '',
+      'Battery Banks': s.power?.batteryBanks || '',
+      'Rectifier Vendor': s.power?.rectifierVendor || '',
+      'Rectifier Capacity': s.power?.rectifierCapacity || '',
+      'Solar Capacity': s.power?.solarCapacity || '',
       'Battery Health (%)': s.power?.batteryHealth || '',
-      'Transmission Type': s.transmission?.type || '',
-      'Bandwidth Capacity': s.transmission?.bandwidthCapacity || '',
-      'Primary Gear': `${s.transmission?.indoorTransEquipmentVendor || ''} ${s.transmission?.indoorTransEquipmentname || ''}`,
-      'Responsible Engineer': s.engineer?.name || '',
-      'Engineer Contact': s.engineer?.phone || '',
-      'Last Audit Date': s.lastAudit || ''
+      'Fuel Level (%)': s.power?.fuelLevel || '',
+      'Current Load': s.power?.currentLoad || '',
+      'Trans Type': s.transmission?.type || '',
+      'Bandwidth': s.transmission?.bandwidthCapacity || '',
+      'Trans Vendor': s.transmission?.vendor || '',
+      'Trans Path': s.transmission?.path || '',
+      'Trans Interface': s.transmission?.interface || '',
+      'Indoor Trans Type': s.transmission?.indoorTransEquipmentType || '',
+      'Indoor Trans Name': s.transmission?.indoorTransEquipmentname || '',
+      'Indoor Trans Vendor': s.transmission?.indoorTransEquipmentVendor || '',
+      'Indoor Trans Type 2': (s.transmission as any)?.indoorTransEquipmentType2 || '',
+      'Indoor Trans Name 2': (s.transmission as any)?.indoorTransEquipmentname2 || '',
+      'Indoor Trans Vendor 2': (s.transmission as any)?.indoorTransEquipmentVendor2 || '',
+      'Hub Site': s.hubSite || '',
+      'Parent Site': s.parentSite || '',
+      'Shelter Type': s.shelterType || '',
+      'Owner Name': s.owner?.name || '',
+      'Owner Contact': s.owner?.contact || '',
+      'Owner Type': s.owner?.type || '',
+      'Access Code': s.owner?.accessCode || '',
+      'Lease Date': s.leaseContract?.Date || '',
+      'Renewal Years': s.leaseContract?.renewalOnYears || '',
+      'Renewal Percent': s.leaseContract?.renewalPercent || '',
+      'Engineer Name': s.engineer?.name || '',
+      'Engineer Phone': s.engineer?.phone || '',
+      'Employee ID': s.engineer?.employeeId || '',
+      'Engineer Shift': s.engineer?.shift || '',
+      'Temp (C)': s.environment?.temp || '',
+      'Humidity (%)': s.environment?.humidity || '',
+      'Smoke Detector': s.environment?.smokeDetector ? 'Yes' : 'No',
+      'Door Open': s.environment?.doorOpen ? 'Yes' : 'No',
+      'Active Alarms': (s.alarms || []).join(', '),
+      'Last Audit': s.lastAudit || '',
+      'Audit By': s.updatedByUserName || ''
     }));
-
-    const ws = XLSX.utils.json_to_sheet(reportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Infrastructure_Report");
-    XLSX.writeFile(wb, `ntc_network_report_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-
-  const handleExport = () => {
-    // If no data, provide a template row
-    const exportData = filteredSites.length > 0 ? filteredSites.map(s => ({
-      site_id: s.siteId,
-      name: s.name,
-      status: s.status,
-      province: s.admin?.province || (s as any).province || '',
-      zone: s.admin?.zone || (s as any).zone || '',
-      district: s.admin?.district || (s as any).district || '',
-      local_level: s.admin?.localLevel || (s as any).local_level || '',
-      lat: s.lat,
-      lng: s.lng,
-      technologies: JSON.stringify(s.technologies),
-      tower: JSON.stringify(s.tower),
-      power: JSON.stringify(s.power),
-      transmission: JSON.stringify(s.transmission),
-      hub_site: s.hubSite ? 'Yes' : 'No',
-      parent_site: s.parentSite || '',
-      shelter_type: s.shelterType || '',
-      owner_info: JSON.stringify(s.owner),
-      lease_contract: JSON.stringify(s.leaseContract),
-      engineer_info: JSON.stringify(s.engineer),
-      environment: JSON.stringify(s.environment),
-      alarms: JSON.stringify(s.alarms),
-      last_audit: s.lastAudit || ''
-    })) : [{
-      site_id: 'TEMPLATE_ID',
-      name: 'Sample Name',
-      status: 'Active',
-      province: 'Bagmati',
-      zone: 'Bagmati',
-      district: 'Kathmandu',
-      local_level: 'KMC',
-      lat: 27.7172,
-      lng: 85.3240,
-      technologies: '{"type": ["2G", "4G"]}',
-      tower: '{"height": "30m", "type": "Roof Top"}',
-      power: '{"source": ["Solar", "NEA"]}',
-      transmission: '{"type": "Microwave"}',
-      hub_site: 'No',
-      parent_site: '',
-      shelter_type: 'Indoor',
-      owner_info: '{"name": "Internal"}',
-      lease_contract: '{}',
-      engineer_info: '{}',
-      environment: '{}',
-      alarms: '[]',
-      last_audit: ''
-    }];
     
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "NTC_Nodes");
-    XLSX.writeFile(wb, `ntc_inventory_template.xlsx`);
+    XLSX.writeFile(wb, `ntc_nodes_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleBulkImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    // Starting import process
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Confirm Bulk Data Injection: Are you sure you want to commit these records to the database?")) return;
-    if (!profile) return;
+    console.log(`Starting bulk import for file: ${file.name}`);
+
+    if (!window.confirm(`Bulk Import Initiation: Are you sure you want to attempt importing records from "${file.name}"?`)) {
+      e.target.value = '';
+      return;
+    }
+
+    if (!profile) {
+      alert("System Error: Your administrative profile is not yet loaded. Please wait a moment and try again.");
+      e.target.value = '';
+      return;
+    }
 
     setImporting(true);
-
     const reader = new FileReader();
+    
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const dataBuffer = evt.target?.result;
+        if (!dataBuffer) throw new Error("The system encountered an error reading the local file buffer.");
+        
+        const wb = XLSX.read(dataBuffer, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
 
-        const failedRowsArr: {row: number, id: string, error: string}[] = [];
-        let duplicateCount = 0;
-        let invalidCount = 0;
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          alert("Import Canceled: The selected Excel file contains no valid data rows or is incorrectly formatted.");
+          setImporting(false);
+          return;
+        }
 
+        console.log(`Successfully parsed ${data.length} rows.`);
+        
         const getVal = (row: any, ...keys: string[]) => {
-          for (const key of keys) {
-            if (row[key] !== undefined && row[key] !== null) return row[key];
-            const lowerKey = key.toLowerCase();
-            const matchingKey = Object.keys(row).find(k => k.toLowerCase() === lowerKey);
-            if (matchingKey) return row[matchingKey];
+          const rowKeys = Object.keys(row);
+          for (const k of keys) {
+            const searchKey = k.toLowerCase().trim();
+            if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+              return typeof row[k] === 'string' ? row[k].trim() : row[k];
+            }
+            const foundKey = rowKeys.find(rk => rk.toLowerCase().trim() === searchKey);
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+              return typeof row[foundKey] === 'string' ? row[foundKey].trim() : row[foundKey];
+            }
           }
           return undefined;
         };
 
-        const toImport = data.filter(row => {
-          const siteId = getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID');
-          if (!siteId) {
+        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()).filter(Boolean));
+        const failedRowsArr: { row: number; id: string; error: string }[] = [];
+        let duplicateCount = 0;
+        let invalidCount = 0;
+
+        const toImport = data.filter((row, idx) => {
+          const idCandidates = ['Node ID', 'siteId', 'NodeID', 'Site ID', 'ID', 'SiteID', 'SiteRef', 'Asset ID', 'Site_ID'];
+          const rowSiteIdRaw = getVal(row, ...idCandidates);
+          
+          if (!rowSiteIdRaw) {
             invalidCount++;
             return false;
           }
-          if (sites.some(s => s.siteId === String(siteId))) {
+
+          const rowSiteId = String(rowSiteIdRaw).toLowerCase().trim();
+          if (existingNodeIds.has(rowSiteId)) {
             duplicateCount++;
             return false;
           }
@@ -287,10 +304,12 @@ export default function Sites({ profile }: SitesProps) {
         });
 
         if (toImport.length === 0) {
-          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}`);
+          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}\n\nPlease ensure your Node IDs are unique and the column header matches "Node ID".`);
           setImporting(false);
           return;
         }
+
+        console.log(`Executing batch import of ${toImport.length} new records...`);
 
         const results = await Promise.all(toImport.map(async (row) => {
           const originalIndex = data.indexOf(row);
@@ -298,65 +317,150 @@ export default function Sites({ profile }: SitesProps) {
           const siteId = String(getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID') || 'Unknown');
 
           try {
-            const tryParse = (val: any) => {
-              if (!val) return {};
-              try { return typeof val === 'string' ? JSON.parse(val) : val; } 
-              catch(e) { return {}; }
-            };
+            let lat = 0, lng = 0;
+            const coords = getVal(row, 'Coordinates', 'Coords', 'Location', 'Lat/Long', 'Lat,Long');
+            if (typeof coords === 'string' && coords.includes(',')) {
+              const parts = coords.split(',').map(p => parseFloat(p.trim()));
+              if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                lat = parts[0];
+                lng = parts[1];
+              }
+            } else {
+              lat = parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0;
+              lng = parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0;
+            }
+
+            const nodeStatus = (getVal(row, 'Status', 'status', 'Site Status') || 'Active') as any;
 
             const newSite: Partial<Site> = {
               siteId: siteId,
               name: String(getVal(row, 'Site Name', 'Name', 'SiteName', 'Site_Name') || 'Unnamed Site'),
-              status: (getVal(row, 'Status', 'status', 'Site Status') || 'Planned') as any,
-              lat: parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0,
-              lng: parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0,
+              status: nodeStatus,
+              lat,
+              lng,
               admin: {
                 province: String(getVal(row, 'Province', 'state', 'Region') || ''),
                 zone: String(getVal(row, 'Zone', 'SubRegion') || ''),
                 district: String(getVal(row, 'District', 'City') || ''),
                 localLevel: String(getVal(row, 'Local Level', 'LocalLevel', 'Municipality', 'Area') || ''),
               },
-              technologies: tryParse(row.technologies) || { type: [], lteType: [], lte1800RRU: [] },
-              tower: tryParse(row.tower) || { height: '', type: '', owner: '', foundation: '' },
-              power: tryParse(row.power) || { source: [], sourceType: '', backupDG: 'No', batteryHealth: 100 },
-              transmission: tryParse(row.transmission) || { type: '', bandwidthCapacity: '' },
-              hubSite: (row.hub_site === 'Yes' || row.hub_site === true) ? 'Yes' : 'No',
+              technologies: {
+                type: String(getVal(row, 'Technologies', 'Technology', 'Network') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lteType: String(getVal(row, 'LTE Bands', 'LTEBands', 'Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lte1800RRU: String(getVal(row, 'LTE RRU Config', 'RRUConfig') || '').split(',').map(s => s.trim()).filter(Boolean),
+              },
+              tower: { 
+                height: String(getVal(row, 'Tower Height', 'Height') || ''), 
+                type: String(getVal(row, 'Tower Type', 'TowerType') || ''), 
+                owner: String(getVal(row, 'Tower Owner', 'TowerOwner') || ''), 
+                foundation: String(getVal(row, 'Tower Foundation', 'Foundation') || '') 
+              },
+              power: { 
+                source: String(getVal(row, 'Power Source', 'Source') || '').split(',').map(s => s.trim()).filter(Boolean),
+                sourceType: String(getVal(row, 'Power Source Type', 'SourceType') || ''),
+                backupDG: (String(getVal(row, 'Backup DG', 'DG') || 'No').trim().toLowerCase().startsWith('y') ? 'Yes' : 'No') as 'Yes' | 'No', 
+                backupDGCapacity: String(getVal(row, 'DG Capacity', 'DGCapacity') || ''), 
+                batteryType: String(getVal(row, 'Battery Type', 'BatteryType') || ''), 
+                batteryCapacity: String(getVal(row, 'Battery Capacity') || ''), 
+                batteryBanks: String(getVal(row, 'Battery Banks', 'BatteryBanks') || ''), 
+                rectifierVendor: String(getVal(row, 'Rectifier Vendor', 'Rectifier') || ''), 
+                rectifierCapacity: String(getVal(row, 'Rectifier Capacity') || ''), 
+                solarCapacity: String(getVal(row, 'Solar Capacity', 'Solar') || ''), 
+                batteryHealth: Math.min(100, Math.max(0, parseInt(String(getVal(row, 'Battery Health (%)') || '100')))), 
+                fuelLevel: Math.min(100, Math.max(0, parseInt(String(getVal(row, 'Fuel Level (%)') || '100')))), 
+                currentLoad: String(getVal(row, 'Current Load', 'Load') || '') 
+              },
+              transmission: { 
+                type: String(getVal(row, 'Trans Type', 'Transmission Media', 'Media') || ''), 
+                bandwidthCapacity: String(getVal(row, 'Bandwidth', 'Capacity') || ''), 
+                vendor: String(getVal(row, 'Trans Vendor', 'Vendor') || ''), 
+                path: String(getVal(row, 'Trans Path', 'Path') || ''), 
+                interface: String(getVal(row, 'Trans Interface', 'Interface') || ''), 
+                indoorTransEquipmentType: String(getVal(row, 'Indoor Trans Type') || ''), 
+                indoorTransEquipmentname: String(getVal(row, 'Indoor Trans Name') || ''), 
+                indoorTransEquipmentVendor: String(getVal(row, 'Indoor Trans Vendor') || ''),
+                indoorTransEquipmentType2: String(getVal(row, 'Indoor Trans Type 2') || ''), 
+                indoorTransEquipmentname2: String(getVal(row, 'Indoor Trans Name 2') || ''), 
+                indoorTransEquipmentVendor2: String(getVal(row, 'Indoor Trans Vendor 2') || '') 
+              },
+              hubSite: (String(getVal(row, 'Hub Site') || 'No').trim().toLowerCase().startsWith('y') ? 'Yes' : 'No') as any,
               parentSite: String(getVal(row, 'Parent Site') || ''),
               shelterType: String(getVal(row, 'Shelter Type') || ''),
-              owner: tryParse(row.owner_info) || { name: '', contact: '', type: 'Internal' },
-              leaseContract: tryParse(row.lease_contract) || { Date: '', renewalPercent: '' },
-              engineer: tryParse(row.engineer_info) || { name: '', phone: '' },
-              environment: tryParse(row.environment) || {},
-              alarms: Array.isArray(tryParse(row.alarms)) ? tryParse(row.alarms) : [],
-              lastAudit: String(getVal(row, 'Last Audit', 'last_audit') || ''),
-              updatedBy: profile.name,
+              owner: { 
+                name: String(getVal(row, 'Owner Name') || ''), 
+                contact: String(getVal(row, 'Owner Contact') || ''), 
+                type: (getVal(row, 'Owner Type') || 'Internal') as any, 
+                accessCode: String(getVal(row, 'Access Code') || '') 
+              },
+              engineer: { 
+                name: String(getVal(row, 'Engineer Name') || ''), 
+                phone: String(getVal(row, 'Engineer Phone') || ''), 
+                employeeId: String(getVal(row, 'Employee ID') || ''), 
+                shift: (getVal(row, 'Engineer Shift') || 'Alpha') as any 
+              },
+              leaseContract: { 
+                Date: String(getVal(row, 'Lease Date') || ''), 
+                renewalOnYears: String(getVal(row, 'Renewal Years') || ''), 
+                renewalPercent: String(getVal(row, 'Renewal Percent') || '') 
+              },
+              environment: { 
+                temp: parseInt(String(getVal(row, 'Temp (C)') || '25')), 
+                humidity: parseInt(String(getVal(row, 'Humidity (%)') || '50')), 
+                smokeDetector: String(getVal(row, 'Smoke Detector') || '').toLowerCase().includes('yes'), 
+                doorOpen: String(getVal(row, 'Door Open') || '').toLowerCase().includes('yes') 
+              },
+              alarms: String(getVal(row, 'Active Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
               updatedByUserId: profile.uid,
               updatedByUserName: profile.name,
+              updatedBy: profile.name,
+              createdAt: new Date(),
+              updatedAt: new Date()
             };
             await createSite(newSite);
             return true;
           } catch (err: any) {
-            failedRowsArr.push({ row: rowNumber, id: siteId, error: err.message || String(err) });
+            console.error(`Import error during database write at row ${rowNumber}:`, err);
+            let errorMessage = "Database Execution Error";
+            try {
+              const errObj = err.message ? JSON.parse(err.message) : err;
+              errorMessage = errObj.error || err.message || String(err);
+            } catch {
+              errorMessage = err.message || String(err);
+            }
+            failedRowsArr.push({ row: rowNumber, id: siteId, error: errorMessage });
             return false;
           }
         }));
 
         const successCount = results.filter(r => r === true).length;
-        let summaryText = `Bulk Import Summary:\n\n✅ Success: ${successCount}\n⏭️ Duplicates Skipped: ${duplicateCount}\n⚠️ Invalid ID: ${invalidCount}\n`;
+        let summaryText = `Bulk Import Summary:\n\n`;
+        summaryText += `✅ Success: ${successCount} sites record added\n`;
+        if (duplicateCount > 0) summaryText += `⏭️ Skipped: ${duplicateCount} existing duplicates\n`;
+        if (invalidCount > 0) summaryText += `⚠️ Invalid: ${invalidCount} rows missing header "Node ID"\n`;
+        
         if (failedRowsArr.length > 0) {
-          summaryText += `\n❌ Failed: ${failedRowsArr.length}\n`;
-          failedRowsArr.slice(0, 5).forEach(f => summaryText += `- Row ${f.row} [${f.id}]: ${f.error}\n`);
+          summaryText += `\n❌ Failed: ${failedRowsArr.length} errors occurred during writing\n`;
+          failedRowsArr.slice(0, 10).forEach(f => {
+            summaryText += `   - Row ${f.row} [ID: ${f.id}]: ${f.error.substring(0, 80)}\n`;
+          });
+          if (failedRowsArr.length > 10) summaryText += `   ... and ${failedRowsArr.length - 10} more.`;
         }
+
         alert(summaryText);
-        setImporting(false);
-        getSites(setSites); // Refresh
       } catch (error: any) {
-        alert("Import Process Failed: Critical parsing error.");
-        console.error(error);
+        console.error("Bulk import process fatal error:", error);
+        alert(`System Failure during Import: ${error.message || "An unexpected error occurred during Excel processing."}`);
+      } finally {
         setImporting(false);
+        if (e.target) e.target.value = '';
+        console.log("Bulk import process finished.");
       }
     };
-    reader.readAsBinaryString(file);
+    reader.onerror = () => {
+      alert("File Access Failure: System could not read the selected local registry file.");
+      setImporting(false);
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleSaveComplaint = async (updated: Complaint) => {
@@ -391,11 +495,25 @@ export default function Sites({ profile }: SitesProps) {
   };
 
   const handleConfirmDelete = async (id: string) => {
-    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this asset record? This cannot be undone.")) {
+    if (!id) {
+       alert("Target Identification Failure: Could not resolve the unique ID for this record.");
+       return;
+    }
+    
+    if (window.confirm("CRITICAL PROTOCOL: Are you sure you want to permanently DESTRUCT this asset record from the production registry? This action is irreversible.")) {
       try {
         await deleteSite(id);
-      } catch (error) {
-        console.error("Delete failed", error);
+        alert("Success: Asset record has been purged from the database.");
+      } catch (error: any) {
+        console.error("Deletion execution failed:", error);
+        let errorMessage = "Check administrative authorization and connection stability.";
+        try {
+          const errStatus = error.message ? JSON.parse(error.message) : (typeof error === 'string' ? JSON.parse(error) : error);
+          errorMessage = errStatus.error || errorMessage;
+        } catch {
+          errorMessage = error.message || String(error);
+        }
+        alert(`Deletion Access Denied: ${errorMessage}`);
       }
     }
   };
@@ -477,27 +595,20 @@ export default function Sites({ profile }: SitesProps) {
             </button>
           )}
           <button 
-            onClick={handleGenerateReport}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
-          >
-            <FileText size={16} className="text-ntc-blue" />
-            <span>Generate Report</span>
-          </button>
-          <button 
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
           >
             <Download size={16} />
             <span>Generate Inventory</span>
           </button>
-          {canEdit && (
+            {canEdit && (
             <div className="flex items-center gap-3">
               <label className={cn(
                 "flex items-center gap-2 rounded-xl border border-ntc-blue/20 bg-ntc-blue/5 px-4 py-2.5 text-sm font-medium text-ntc-blue transition-all",
                 importing ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-ntc-blue/10"
               )}>
                 {importing ? (
-                  <Activity size={16} className="animate-spin text-ntc-blue" />
+                  <Activity size={16} className="animate-spin" />
                 ) : (
                   <Download size={16} className="rotate-180" />
                 )}

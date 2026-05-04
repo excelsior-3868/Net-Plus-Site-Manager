@@ -5,16 +5,19 @@ import { useState } from 'react';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      await login(email || 'admin@netplus.com');
+      await login(employeeId, password);
       window.location.reload();
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
       setLoading(false);
     }
   };
@@ -43,17 +46,34 @@ export default function Login() {
         <div className="w-full rounded-2xl border border-ntc-blue/10 bg-white p-8 shadow-[20px_20px_60px_-15px_rgba(0,0,0,0.05)]">
           <div className="mb-8 text-center">
             <h2 className="text-xl font-medium text-ntc-blue">Secure Access</h2>
-            <p className="mt-2 text-sm text-ntc-blue/60">Sign in to manage your network infrastructure.</p>
+            <p className="mt-2 text-sm text-ntc-blue/60">Sign in with your Employee Credentials.</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-5">
+            {error && (
+              <div className="rounded-xl bg-red-50 p-3 text-xs font-medium text-red-600 border border-red-100">
+                {error}
+              </div>
+            )}
             <div className="space-y-1">
-              <label className="text-[10px] font-mono uppercase tracking-widest opacity-40">Email Address</label>
+              <label className="text-[10px] font-mono uppercase tracking-widest opacity-40">Employee ID</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@netplus.com"
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
+                placeholder="E.G. ADMIN001"
+                className="w-full rounded-xl border border-ntc-blue/10 bg-gray-50 px-4 py-3 text-sm focus:border-ntc-blue focus:outline-none"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono uppercase tracking-widest opacity-40">Security Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 className="w-full rounded-xl border border-ntc-blue/10 bg-gray-50 px-4 py-3 text-sm focus:border-ntc-blue focus:outline-none"
                 required
               />
@@ -69,7 +89,7 @@ export default function Login() {
               ) : (
                 <>
                   <LogIn size={18} />
-                  <span>Sign In to Dashboard</span>
+                  <span>Authenticate to Portal</span>
                 </>
               )}
               

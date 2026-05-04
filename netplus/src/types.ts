@@ -15,7 +15,6 @@ export interface UserProfile {
   role: UserRole;
   active: boolean;
   createdAt: string;
-  employeeId?: string;
 }
 
 export interface Complaint {
