@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { query } from './db';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -72,9 +73,9 @@ app.post('/api/login', async (req, res) => {
 
     const user = result.rows[0];
     
-    // In a production app, use bcrypt to compare hashes
-    // For now, doing a simple string comparison as requested
-    if (user.password !== password) {
+    // Use bcrypt to compare the provided password with the hashed password in the DB
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Incorrect password' });
     }
 
