@@ -29,6 +29,7 @@ export interface Complaint {
   zone: string;
   district: string;
   localLevel: string;
+  complaintType: 'SITE COMPLAINT' | 'NETWORK COMPLAINT';
   lat: number;
   lng: number;
   siteId?: string;

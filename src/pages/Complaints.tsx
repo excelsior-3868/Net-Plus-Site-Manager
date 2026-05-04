@@ -26,6 +26,7 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   const [search, setSearch] = useState('');
   const [filterProvince, setFilterProvince] = useState(provinceParam || 'All');
   const [filterStatus, setFilterStatus] = useState('Active');
+  const [filterType, setFilterType] = useState('All');
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,16 +61,20 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
         matchesStatus = c.status === filterStatus;
       }
       
-      return matchesSearch && matchesProvince && matchesStatus;
+      const matchesType = filterType === 'All' || c.complaintType === filterType;
+      
+      return matchesSearch && matchesProvince && matchesStatus && matchesType;
     });
   }, [complaints, search, filterProvince, filterStatus]);
 
   const PROVINCES = ['All', 'Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
   const STATUSES = ['Active', 'Open', 'In Progress', 'Resolved', 'All'];
+  const TYPES = ['All', 'SITE COMPLAINT', 'NETWORK COMPLAINT'];
 
   const handleExport = () => {
     const dataToExport = filteredComplaints.map(c => ({
       'Ticket Number': c.ticketNumber,
+      'Complaint Type': c.complaintType,
       'Complaint Name': c.complaintName,
       'Complainer': c.complainerName,
       'Contact': c.complainerContact,
@@ -92,6 +97,7 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
     setSearch('');
     setFilterProvince('All');
     setFilterStatus('Active');
+    setFilterType('All');
   };
 
   const handleSave = async (updated: Complaint) => {
@@ -168,7 +174,6 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
               {PROVINCES.map(p => <option key={p} value={p}>{p === 'All' ? 'All Provinces' : p}</option>)}
            </select>
         </div>
-
         <div className="relative group">
            <AlertCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-ntc-blue" size={16} />
            <select 
@@ -180,7 +185,18 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
            </select>
         </div>
 
-        { (search || filterProvince !== 'All' || filterStatus !== 'Active') && (
+        <div className="relative group">
+           <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-ntc-blue" size={16} />
+           <select 
+              className="w-full appearance-none rounded-2xl bg-white border border-gray-200 py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-ntc-blue focus:ring-4 focus:ring-ntc-blue/10 transition-all shadow-sm"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+           >
+              {TYPES.map(t => <option key={t} value={t}>{t === 'All' ? 'All Types' : t}</option>)}
+           </select>
+        </div>
+
+        { (search || filterProvince !== 'All' || filterStatus !== 'Active' || filterType !== 'All') && (
             <button 
                 onClick={clearFilters}
                 className="flex items-center justify-center gap-1.5 rounded-2xl bg-red-50 text-red-600 text-xs font-bold transition-all hover:bg-red-100"
@@ -216,6 +232,12 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
                         {c.createdByUserName && (
                           <p className="text-[8px] text-gray-400 mt-0.5">By: {c.createdByUserName}</p>
                         )}
+                        <span className={cn(
+                          "mt-1 inline-block px-1.5 py-0.5 rounded text-[7px] font-bold tracking-widest uppercase",
+                          c.complaintType === 'SITE COMPLAINT' ? "bg-blue-50 text-blue-600 border border-blue-100" : "bg-purple-50 text-purple-600 border border-purple-100"
+                        )}>
+                          {c.complaintType}
+                        </span>
                       </div>
                     </div>
                   </td>

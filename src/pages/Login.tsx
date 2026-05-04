@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { LogIn, Radio } from 'lucide-react';
+import { LogIn, Radio, Eye, EyeOff } from 'lucide-react';
 import { login } from '../services/authService';
 import { useState } from 'react';
 
@@ -7,6 +7,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -69,14 +70,24 @@ export default function Login() {
 
             <div className="space-y-1">
               <label className="text-[10px] font-mono uppercase tracking-widest opacity-40">Security Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-ntc-blue/10 bg-gray-50 px-4 py-3 text-sm focus:border-ntc-blue focus:outline-none"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl border border-ntc-blue/10 bg-gray-50 px-4 py-3 text-sm focus:border-ntc-blue focus:outline-none pr-11"
+                  required
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-ntc-blue/30 hover:text-ntc-blue transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -97,18 +108,6 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-8 border-t border-ntc-blue/5 pt-8">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-[10px] font-mono uppercase tracking-widest opacity-40">Version</p>
-                <p className="text-xs font-mono">v4.2.0-stable</p>
-              </div>
-              <div className="flex flex-col gap-1 text-right">
-                <p className="text-[10px] font-mono uppercase tracking-widest opacity-40">Region</p>
-                <p className="text-xs font-mono">ASIA-SE1</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         <p className="mt-12 text-[10px] font-mono uppercase tracking-widest opacity-30">

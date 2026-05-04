@@ -27,6 +27,7 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
     lat: 0,
     lng: 0,
     siteId: '',
+    complaintType: 'NETWORK COMPLAINT',
     nearestSites: [],
   });
 
@@ -53,6 +54,7 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
         lat: 0,
         lng: 0,
         siteId: '',
+        complaintType: 'NETWORK COMPLAINT',
         nearestSites: [],
       });
       setSiteSearch('');
@@ -126,9 +128,9 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
             <div className="flex items-center gap-2 mt-1">
                <span className={cn(
                  "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider",
-                 formData.type === 'Network' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                 formData.complaintType === 'NETWORK COMPLAINT' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                )}>
-                 {formData.type} Complaint
+                 {formData.complaintType}
                </span>
                <p className="text-[10px] text-ntc-blue/60 font-medium uppercase tracking-wider">
                 {formData.ticketNumber || 'System Ticket'}
@@ -148,10 +150,10 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: 'Network', siteId: '' })}
+                  onClick={() => setFormData({ ...formData, type: 'Network', complaintType: 'NETWORK COMPLAINT', siteId: '' })}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                    formData.type === 'Network' 
+                    formData.complaintType === 'NETWORK COMPLAINT' 
                       ? "border-ntc-blue bg-ntc-blue/5 text-ntc-blue shadow-md" 
                       : "border-gray-100 bg-gray-50/50 text-gray-400 hover:border-gray-200"
                   )}
@@ -159,15 +161,15 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
                   <MapPin size={24} />
                   <div className="text-center">
                     <p className="text-xs font-bold uppercase tracking-wide">Network Complaint</p>
-                    <p className="text-[9px] opacity-70">Public / General Area Issue</p>
+                    <p className="text-[9px] opacity-70">General Area Issue</p>
                   </div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: 'Site' })}
+                  onClick={() => setFormData({ ...formData, type: 'Site', complaintType: 'SITE COMPLAINT' })}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                    formData.type === 'Site' 
+                    formData.complaintType === 'SITE COMPLAINT' 
                       ? "border-ntc-blue bg-ntc-blue/5 text-ntc-blue shadow-md" 
                       : "border-gray-100 bg-gray-50/50 text-gray-400 hover:border-gray-200"
                   )}
@@ -175,7 +177,7 @@ const ComplaintFormModal: React.FC<ComplaintFormModalProps> = ({ isOpen, onClose
                   <Search size={24} />
                   <div className="text-center">
                     <p className="text-xs font-bold uppercase tracking-wide">Site Complaint</p>
-                    <p className="text-[9px] opacity-70">Specific Station / Tech Issue</p>
+                    <p className="text-[9px] opacity-70">Specific Station Issue</p>
                   </div>
                 </button>
               </div>

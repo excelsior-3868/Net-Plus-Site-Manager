@@ -192,6 +192,7 @@ app.get('/api/complaints', async (req, res) => {
         lat: parseFloat(row.lat),
         lng: parseFloat(row.lng),
         siteId: row.site_id,
+        complaintType: row.complaint_type,
         status: row.status,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -208,12 +209,12 @@ app.post('/api/complaints', async (req, res) => {
     const result = await query(
       `INSERT INTO complaints (
         ticket_number, complaint_name, complainer_name, complainer_contact, 
-        province, zone, district, local_level, lat, lng, site_id, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+        province, zone, district, local_level, lat, lng, site_id, complaint_type, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
       RETURNING id`,
       [
         c.ticketNumber, c.complaintName, c.complainerName, c.complainerContact,
-        c.province, c.zone, c.district, c.localLevel, c.lat, c.lng, c.siteId, c.status || 'Open'
+        c.province, c.zone, c.district, c.localLevel, c.lat, c.lng, c.siteId, c.complaintType, c.status || 'Open'
       ]
     );
     res.status(201).json({ id: result.rows[0].id });
