@@ -32,6 +32,7 @@ import * as XLSX from 'xlsx';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import SiteFormModal from '../components/SiteFormModal';
 import ComplaintFormModal from '../components/ComplaintFormModal';
+import BulkImportPreviewModal from '../components/BulkImportPreviewModal';
 
 interface SitesProps {
   profile: UserProfile | null;
@@ -47,6 +48,9 @@ export default function Sites({ profile }: SitesProps) {
   const [editingSite, setEditingSite] = useState<Site | undefined>(undefined);
   const [editingComplaint, setEditingComplaint] = useState<Complaint | undefined>(undefined);
   const [importing, setImporting] = useState(false);
+  const [isPreviewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, duplicates: 0, invalid: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const provinceParam = searchParams.get('province');
@@ -73,7 +77,7 @@ export default function Sites({ profile }: SitesProps) {
       let matchesFilter = true;
       const tech = s.technologies;
       const techLength = Array.isArray(tech) ? tech.length : (tech?.type?.length || 0);
-      const isProposed = s.status === 'Planned' || s.status === 'Surveyed' || techLength === 0;
+      const isProposed = s.status === 'Planned' || s.status === 'Surveyed';
 
       if (isSolarView || activeFilter === 'solar') {
         const sources = Array.isArray(s.power?.source) ? s.power.source : [String(s.power?.source || '')];
@@ -188,54 +192,72 @@ export default function Sites({ profile }: SitesProps) {
   };
 
   const handleExport = () => {
-    // If no data, provide a template row
-    const exportData = filteredSites.length > 0 ? filteredSites.map(s => ({
-      site_id: s.siteId,
-      name: s.name,
-      status: s.status,
-      province: s.admin?.province || (s as any).province || '',
-      zone: s.admin?.zone || (s as any).zone || '',
-      district: s.admin?.district || (s as any).district || '',
-      local_level: s.admin?.localLevel || (s as any).local_level || '',
-      lat: s.lat,
-      lng: s.lng,
-      technologies: JSON.stringify(s.technologies),
-      tower: JSON.stringify(s.tower),
-      power: JSON.stringify(s.power),
-      transmission: JSON.stringify(s.transmission),
-      hub_site: s.hubSite ? 'Yes' : 'No',
-      parent_site: s.parentSite || '',
-      shelter_type: s.shelterType || '',
-      owner_info: JSON.stringify(s.owner),
-      lease_contract: JSON.stringify(s.leaseContract),
-      engineer_info: JSON.stringify(s.engineer),
-      environment: JSON.stringify(s.environment),
-      alarms: JSON.stringify(s.alarms),
-      last_audit: s.lastAudit || ''
-    })) : [{
-      site_id: 'TEMPLATE_ID',
-      name: 'Sample Name',
-      status: 'Active',
-      province: 'Bagmati',
-      zone: 'Bagmati',
-      district: 'Kathmandu',
-      local_level: 'KMC',
-      lat: 27.7172,
-      lng: 85.3240,
-      technologies: '{"type": ["2G", "4G"]}',
-      tower: '{"height": "30m", "type": "Roof Top"}',
-      power: '{"source": ["Solar", "NEA"]}',
-      transmission: '{"type": "Microwave"}',
-      hub_site: 'No',
-      parent_site: '',
-      shelter_type: 'Indoor',
-      owner_info: '{"name": "Internal"}',
-      lease_contract: '{}',
-      engineer_info: '{}',
-      environment: '{}',
-      alarms: '[]',
-      last_audit: ''
-    }];
+    // Generate a flat template matching the NTC import schema (limit to 4 rows for template)
+    const exportData = (filteredSites.length > 0 ? filteredSites.slice(0, 4) : [{}]).map(s => {
+      const site = s as Site;
+      return {
+        'Node ID': site.siteId || '',
+        'Site Name': site.name || '',
+        'Status': site.status || 'Active',
+        'Coordinates': (site.lat && site.lng) ? `${site.lat}, ${site.lng}` : '',
+        'Province': site.admin?.province || '',
+        'Zone': site.admin?.zone || '',
+        'District': site.admin?.district || '',
+        'Local Level': site.admin?.localLevel || '',
+        'Technologies': Array.isArray(site.technologies?.type) ? site.technologies.type.join(', ') : '',
+        'LTE Bands': Array.isArray(site.technologies?.lteType) ? site.technologies.lteType.join(', ') : '',
+        'LTE RRU Config': Array.isArray(site.technologies?.lteRRUConfig) ? site.technologies.lteRRUConfig.join(', ') : '',
+        'Tower Height (m)': site.tower?.height || '',
+        'Tower Type': site.tower?.type || '',
+        'Tower Owner': site.tower?.owner || '',
+        'Tower Foundation': site.tower?.foundation || '',
+        'Power Source': Array.isArray(site.power?.source) ? site.power.source.join(', ') : '',
+        'Power Source Type': site.power?.sourceType || '',
+        'Backup DG': site.power?.backupDG || 'No',
+        'DG Capacity (kVA)': site.power?.backupDGCapacity || '',
+        'Battery Type': site.power?.batteryType || '',
+        'Battery Capacity (Ah)': site.power?.batteryCapacity || '',
+        'Battery Banks': site.power?.batteryBanks || '',
+        'Rectifier Vendor': site.power?.rectifierVendor || '',
+        'Rectifier Capacity (A)': site.power?.rectifierCapacity || '',
+        'Solar Capacity (kWp)': site.power?.solarCapacity || '',
+        'Battery Health (%)': site.power?.batteryHealth || 0,
+        'Fuel Level (%)': site.power?.fuelLevel || 0,
+        'Current Load (A)': site.power?.currentLoad || '',
+        'Trans Type': site.transmission?.type || 'Fiber',
+        'Bandwidth': site.transmission?.bandwidthCapacity || '',
+        'Trans Vendor': site.transmission?.vendor || '',
+        'Trans Path': site.transmission?.path || '',
+        'Trans Interface': site.transmission?.interface || '',
+        'Indoor Trans Type': site.transmission?.indoorTransEquipmentType || '',
+        'Indoor Trans Name': site.transmission?.indoorTransEquipmentname || '',
+        'Indoor Trans Vendor': site.transmission?.indoorTransEquipmentVendor || '',
+        'Indoor Trans Type 2': site.transmission?.indoorTransEquipmentType2 || '',
+        'Indoor Trans Name 2': site.transmission?.indoorTransEquipmentname2 || '',
+        'Indoor Trans Vendor 2': site.transmission?.indoorTransEquipmentVendor2 || '',
+        'Hub Site': site.hubSite || 'No',
+        'Parent Site': site.parentSite || '',
+        'Shelter Type': site.shelterType || 'Outdoor',
+        'Owner Name': site.owner?.name || '',
+        'Owner Contact': site.owner?.contact || '',
+        'Owner Type': site.owner?.type || 'Internal',
+        'Access Code': site.owner?.accessCode || '',
+        'Lease Date': site.leaseContract?.Date || '',
+        'Renewal (Years)': site.leaseContract?.renewalOnYears || '',
+        'Renewal (%)': site.leaseContract?.renewalPercent || '',
+        'Engineer Name': site.engineer?.name || '',
+        'Engineer Phone': site.engineer?.phone || '',
+        'Employee ID': site.engineer?.employeeId || '',
+        'Shift': site.engineer?.shift || '',
+        'Temp (C)': site.environment?.temp || 0,
+        'Humidity (%)': site.environment?.humidity || 0,
+        'Smoke Detector': site.environment?.smokeDetector ? 'Yes' : 'No',
+        'Door Open Alarm': site.environment?.doorOpen ? 'Yes' : 'No',
+        'Alarms': Array.isArray(site.alarms) ? site.alarms.join(', ') : '',
+        'Last Audit': site.lastAudit || '',
+        'Audit By': site.auditBy || ''
+      };
+    });
     
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -243,246 +265,186 @@ export default function Sites({ profile }: SitesProps) {
     XLSX.writeFile(wb, `ntc_inventory_template.xlsx`);
   };
 
-  const handleBulkImport = async (e: ChangeEvent<HTMLInputElement>) => {
-    // Starting import process
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const handleBulkImport = (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    console.log(`Starting bulk import for file: ${file.name}`);
-
-    if (!window.confirm(`Bulk Import Initiation: Are you sure you want to attempt importing records from "${file.name}"?`)) {
-      e.target.value = '';
-      return;
-    }
-
-    if (!profile) {
-      alert("System Error: Your administrative profile is not yet loaded. Please wait a moment and try again.");
-      e.target.value = '';
-      return;
-    }
-
-    setImporting(true);
-    const reader = new FileReader();
-    
-    reader.onload = async (evt) => {
-      try {
-        const dataBuffer = evt.target?.result;
-        if (!dataBuffer) throw new Error("The system encountered an error reading the local file buffer.");
-        
-        const wb = XLSX.read(dataBuffer, { type: 'array' });
+      setImporting(true);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        if (!data || !Array.isArray(data) || data.length === 0) {
-          alert("Import Canceled: The selected Excel file contains no valid data rows or is incorrectly formatted.");
-          setImporting(false);
-          return;
-        }
+        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()));
 
-        console.log(`Successfully parsed ${data.length} rows.`);
-        
         const getVal = (row: any, ...keys: string[]) => {
-          const rowKeys = Object.keys(row);
-          for (const k of keys) {
-            const searchKey = k.toLowerCase().trim();
-            if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
-              return typeof row[k] === 'string' ? row[k].trim() : row[k];
-            }
-            const foundKey = rowKeys.find(rk => rk.toLowerCase().trim() === searchKey);
-            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
-              return typeof row[foundKey] === 'string' ? row[foundKey].trim() : row[foundKey];
-            }
+          for (const key of keys) {
+            if (row[key] !== undefined) return row[key];
           }
-          return undefined;
+          return '';
         };
 
-        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()).filter(Boolean));
-        const failedRowsArr: { row: number; id: string; error: string }[] = [];
-        let duplicateCount = 0;
-        let invalidCount = 0;
+        const previewData = data.filter((row: any) => {
+          return getVal(row, 'Node ID', 'BTS ID', 'Site ID');
+        }).map((dataRow: any) => {
+          const item: any = {
+            siteId: String(getVal(dataRow, 'Node ID', 'BTS ID', 'Site ID') || '').trim(),
+            name: String(getVal(dataRow, 'Site Name', 'Name') || '').trim(),
+            status: 'Active',
+            admin: {
+              province: getVal(dataRow, 'Province') || '',
+              zone: getVal(dataRow, 'Zone') || '',
+              district: getVal(dataRow, 'District') || '',
+              localLevel: getVal(dataRow, 'Local Level') || '',
+            },
+            technologies: {
+              type: String(getVal(dataRow, 'Technologies', 'Technology') || '').split(',').map(s => s.trim()).filter(Boolean),
+              lteType: String(getVal(dataRow, 'LTE Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
+              lteRRUConfig: String(getVal(dataRow, 'LTE RRU Config') || '').split(',').map(s => s.trim()).filter(Boolean),
+            },
+            tower: {
+              height: getVal(dataRow, 'Tower Height (m)') || '',
+              type: getVal(dataRow, 'Tower Type') || '',
+              owner: getVal(dataRow, 'Tower Owner') || '',
+              foundation: getVal(dataRow, 'Tower Foundation') || '',
+            },
+            power: {
+              source: String(getVal(dataRow, 'Power Source') || '').split(',').map(s => s.trim()).filter(Boolean),
+              sourceType: getVal(dataRow, 'Power Source Type') || '',
+              backupDG: getVal(dataRow, 'Backup DG') || 'No',
+              backupDGCapacity: getVal(dataRow, 'DG Capacity (kVA)') || '',
+              batteryType: getVal(dataRow, 'Battery Type') || '',
+              batteryCapacity: getVal(dataRow, 'Battery Capacity (Ah)') || '',
+              batteryBanks: getVal(dataRow, 'Battery Banks') || '',
+              rectifierVendor: getVal(dataRow, 'Rectifier Vendor') || '',
+              rectifierCapacity: getVal(dataRow, 'Rectifier Capacity (A)') || '',
+              solarCapacity: getVal(dataRow, 'Solar Capacity (kWp)') || '',
+              batteryHealth: parseInt(String(getVal(dataRow, 'Battery Health (%)') || '0')) || 0,
+              fuelLevel: parseInt(String(getVal(dataRow, 'Fuel Level (%)') || '0')) || 0,
+              currentLoad: getVal(dataRow, 'Current Load (A)') || '',
+            },
+            transmission: {
+              type: getVal(dataRow, 'Trans Type') || 'Fiber',
+              bandwidthCapacity: getVal(dataRow, 'Bandwidth') || '',
+              vendor: getVal(dataRow, 'Trans Vendor') || '',
+              path: getVal(dataRow, 'Trans Path') || '',
+              interface: getVal(dataRow, 'Trans Interface') || '',
+              indoorTransEquipmentType: getVal(dataRow, 'Indoor Trans Type') || '',
+              indoorTransEquipmentname: getVal(dataRow, 'Indoor Trans Name') || '',
+              indoorTransEquipmentVendor: getVal(dataRow, 'Indoor Trans Vendor') || '',
+              indoorTransEquipmentType2: getVal(dataRow, 'Indoor Trans Type 2') || '',
+              indoorTransEquipmentname2: getVal(dataRow, 'Indoor Trans Name 2') || '',
+              indoorTransEquipmentVendor2: getVal(dataRow, 'Indoor Trans Vendor 2') || '',
+            },
+            hubSite: getVal(dataRow, 'Hub Site') || 'No',
+            parentSite: getVal(dataRow, 'Parent Site') || '',
+            shelterType: getVal(dataRow, 'Shelter Type') || 'Outdoor',
+            owner: {
+              name: getVal(dataRow, 'Owner Name') || '',
+              contact: getVal(dataRow, 'Owner Contact') || '',
+              type: getVal(dataRow, 'Owner Type') || 'Internal',
+              accessCode: getVal(dataRow, 'Access Code') || '',
+            },
+            leaseContract: {
+              Date: getVal(dataRow, 'Lease Date') || '',
+              renewalOnYears: getVal(dataRow, 'Renewal (Years)') || '',
+              renewalPercent: getVal(dataRow, 'Renewal (%)') || '',
+            },
+            engineer: {
+              name: getVal(dataRow, 'Engineer Name') || '',
+              phone: getVal(dataRow, 'Engineer Phone') || '',
+              employeeId: getVal(dataRow, 'Employee ID') || '',
+              shift: getVal(dataRow, 'Shift') || '',
+            },
+            environment: {
+              temp: parseFloat(String(getVal(dataRow, 'Temp (C)') || '0')) || 0,
+              humidity: parseFloat(String(getVal(dataRow, 'Humidity (%)') || '0')) || 0,
+              smokeDetector: String(getVal(dataRow, 'Smoke Detector') || '').toLowerCase() === 'yes',
+              doorOpen: String(getVal(dataRow, 'Door Open Alarm') || '').toLowerCase() === 'yes',
+            },
+            alarms: String(getVal(dataRow, 'Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
+            lastAudit: getVal(dataRow, 'Last Audit') || '',
+            auditBy: getVal(dataRow, 'Audit By') || '',
+          };
 
-        const toImport = data.filter((row) => {
-          const idCandidates = ['Node ID', 'siteId', 'NodeID', 'Site ID', 'ID', 'SiteID', 'SiteRef', 'Asset ID', 'Site_ID'];
-          const rowSiteIdRaw = getVal(row, ...idCandidates);
-          
-          if (!rowSiteIdRaw) {
-            invalidCount++;
-            return false;
+          const coords = getVal(dataRow, 'Coordinates');
+          if (typeof coords === 'string' && coords.includes(',')) {
+            const parts = coords.split(',').map(p => parseFloat(p.trim()));
+            if (parts.length >= 2) {
+              item.lat = parts[0];
+              item.lng = parts[1];
+            }
           }
 
-          const rowSiteId = String(rowSiteIdRaw).toLowerCase().trim();
-          if (existingNodeIds.has(rowSiteId)) {
-            duplicateCount++;
-            return false;
-          }
-          return true;
+          item._isDuplicate = item.siteId && existingNodeIds.has(item.siteId.toLowerCase());
+          item._isInvalid = !item.siteId;
+          return item;
         });
 
-        if (toImport.length === 0) {
-          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}\n\nPlease ensure your Node IDs are unique and the column header matches "Node ID".`);
-          setImporting(false);
-          return;
-        }
-
-        console.log(`Executing batch import of ${toImport.length} new records...`);
-
-        const results = await Promise.all(toImport.map(async (row) => {
-          const originalIndex = data.indexOf(row);
-          const rowNumber = originalIndex + 2;
-          const siteId = String(getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID', 'Asset ID') || 'Unknown');
-
-          try {
-            let lat = 0, lng = 0;
-            const coords = getVal(row, 'Coordinates', 'Coords', 'Location', 'Lat/Long', 'Lat,Long', 'GPS');
-            if (typeof coords === 'string' && coords.includes(',')) {
-              const parts = coords.split(',').map(p => parseFloat(p.trim()));
-              if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                lat = parts[0];
-                lng = parts[1];
-              }
-            } else {
-              lat = parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0;
-              lng = parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0;
-            }
-
-            const nodeStatus = (getVal(row, 'Status', 'status', 'Site Status') || 'Active') as any;
-
-            const newSite: Partial<Site> = {
-              siteId: siteId,
-              name: String(getVal(row, 'Site Name', 'Name', 'SiteName', 'Site_Name') || 'Unnamed Site'),
-              status: nodeStatus,
-              lat,
-              lng,
-              admin: {
-                province: String(getVal(row, 'Province', 'state', 'Region') || ''),
-                zone: String(getVal(row, 'Zone', 'SubRegion') || ''),
-                district: String(getVal(row, 'District', 'City') || ''),
-                localLevel: String(getVal(row, 'Local Level', 'LocalLevel', 'Municipality', 'Area') || ''),
-              },
-              technologies: {
-                type: String(getVal(row, 'Technologies', 'Technology', 'Network') || '').split(',').map(s => s.trim()).filter(Boolean),
-                lteType: String(getVal(row, 'LTE Bands', 'LTEBands', 'Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
-                lte1800RRU: String(getVal(row, 'LTE RRU Config', 'RRUConfig') || '').split(',').map(s => s.trim()).filter(Boolean),
-              },
-              tower: {
-                height: String(getVal(row, 'Tower Height', 'Height', 'TowerHeight') || ''),
-                type: String(getVal(row, 'Tower Type', 'Type', 'TowerType') || ''),
-                owner: String(getVal(row, 'Tower Owner', 'Tower_Owner') || ''),
-                foundation: String(getVal(row, 'Foundation', 'Tower_Foundation') || ''),
-              },
-              power: {
-                source: String(getVal(row, 'Power Source', 'Source', 'MainPower') || '').split(',').map(s => s.trim()).filter(Boolean),
-                sourceType: String(getVal(row, 'Connection Type', 'PowerType') || ''),
-                backupDG: String(getVal(row, 'Backup DG', 'DG_Available') || 'No'),
-                backupDGCapacity: String(getVal(row, 'DG Capacity', 'DG_KVA') || ''),
-                batteryType: String(getVal(row, 'Battery Type', 'BatteryType') || ''),
-                batteryCapacity: String(getVal(row, 'Battery Capacity', 'Ah') || ''),
-                batteryBanks: String(getVal(row, 'Battery Banks', 'Banks') || ''),
-                rectifierVendor: String(getVal(row, 'Rectifier Vendor', 'Rect_Vendor') || ''),
-                rectifierCapacity: String(getVal(row, 'Rectifier Capacity', 'Rect_Amp') || ''),
-                solarCapacity: String(getVal(row, 'Solar Capacity', 'Solar_kWp') || ''),
-                batteryHealth: parseInt(String(getVal(row, 'Battery Health (%)', 'Battery Health', 'Health %') || '100')) || 100,
-                fuelLevel: parseInt(String(getVal(row, 'Fuel Level (%)', 'Fuel Level', 'Fuel %') || '100')) || 100,
-                currentLoad: String(getVal(row, 'Current Load', 'Load_kW', 'Load') || ''),
-              },
-              transmission: {
-                type: String(getVal(row, 'Trans Type', 'Media', 'Transmission') || 'Fiber'),
-                bandwidthCapacity: String(getVal(row, 'Bandwidth', 'Capacity') || ''),
-                vendor: String(getVal(row, 'Trans Vendor', 'Vendor') || ''),
-                path: String(getVal(row, 'Trans Path', 'Route') || ''),
-                interface: String(getVal(row, 'Trans Interface', 'Port') || ''),
-                indoorTransEquipmentType: String(getVal(row, 'Indoor Trans Type', 'Hardware') || 'Router'),
-                indoorTransEquipmentname: String(getVal(row, 'Indoor Trans Name', 'Model') || ''),
-                indoorTransEquipmentVendor: String(getVal(row, 'Indoor Trans Vendor', 'HW_Vendor') || ''),
-                indoorTransEquipmentType2: String(getVal(row, 'Indoor Trans Type 2') || ''),
-                indoorTransEquipmentname2: String(getVal(row, 'Indoor Trans Name 2') || ''),
-                indoorTransEquipmentVendor2: String(getVal(row, 'Indoor Trans Vendor 2') || ''),
-              },
-              hubSite: String(getVal(row, 'Hub Site', 'isHub') || 'No') as any,
-              parentSite: String(getVal(row, 'Parent Site', 'ParentNode') || ''),
-              shelterType: String(getVal(row, 'Shelter Type', 'Shelter') || 'Outdoor'),
-              owner: {
-                name: String(getVal(row, 'Owner Name', 'AssetOwner') || ''),
-                contact: String(getVal(row, 'Owner Contact') || ''),
-                type: String(getVal(row, 'Owner Type') || 'Internal'),
-                accessCode: String(getVal(row, 'Access Code') || ''),
-              },
-              leaseContract: {
-                Date: String(getVal(row, 'Lease Date', 'ContractDate') || ''),
-                renewalOnYears: String(getVal(row, 'Renewal Years') || ''),
-                renewalPercent: String(getVal(row, 'Renewal Percent') || ''),
-              },
-              engineer: {
-                name: String(getVal(row, 'Engineer Name', 'FieldEngineer') || ''),
-                phone: String(getVal(row, 'Engineer Phone', 'Contact') || ''),
-                employeeId: String(getVal(row, 'Employee ID', 'EmpID') || ''),
-                shift: String(getVal(row, 'Engineer Shift', 'Shift') || ''),
-              },
-              lastAudit: String(getVal(row, 'Last Audit', 'AuditDate') || new Date().toLocaleDateString()),
-              environment: {
-                temp: String(getVal(row, 'Temp (C)', 'Temperature') || ''),
-                humidity: String(getVal(row, 'Humidity (%)', 'Humidity') || ''),
-                smokeDetector: String(getVal(row, 'Smoke Detector', 'Smoke') || 'No'),
-                doorOpen: String(getVal(row, 'Door Open', 'Door') || 'No'),
-              },
-              alarms: String(getVal(row, 'Active Alarms', 'Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
-              updatedBy: profile.name,
-              updatedByUserId: profile.uid,
-              updatedByUserName: profile.name,
-            };
-
-            await createSite(newSite);
-
-            // Automatically trigger complaint if battery health is below 50%
-            if (newSite.power?.batteryHealth !== undefined && newSite.power.batteryHealth < 50) {
-              const ticketNumber = `ALAM-BAT-${Math.floor(1000 + Math.random() * 9000)}`;
-              await createComplaint({
-                ticketNumber,
-                type: 'Site',
-                complaintName: `Low Battery Health Alarm: ${newSite.power?.batteryHealth}%`,
-                complainerName: 'System Monitor',
-                complainerContact: 'Auto-Generated',
-                province: newSite.admin?.province || '',
-                zone: newSite.admin?.zone || '',
-                district: newSite.admin?.district || '',
-                localLevel: newSite.admin?.localLevel || '',
-                lat: newSite.lat || 0,
-                lng: newSite.lng || 0,
-                siteId: newSite.siteId,
-                complaintType: 'SITE COMPLAINT',
-                status: 'Open'
-              });
-            }
-            return true;
-          } catch (err: any) {
-            console.error(`Row ${rowNumber} failed:`, err);
-            failedRowsArr.push({ row: rowNumber, id: siteId, error: err.message || String(err) });
-            return false;
-          }
-        }));
-
-        const successCount = results.filter(r => r === true).length;
-        let summaryText = `Bulk Import Summary:\n\n✅ Success: ${successCount}\n⏭️ Duplicates Skipped: ${duplicateCount}\n⚠️ Invalid ID: ${invalidCount}\n`;
-        if (failedRowsArr.length > 0) {
-          summaryText += `\n❌ Failed Transactions: ${failedRowsArr.length}\n`;
-          failedRowsArr.slice(0, 5).forEach(f => summaryText += `- Row ${f.row} [${f.id}]: ${f.error}\n`);
-          if (failedRowsArr.length > 5) summaryText += `... and ${failedRowsArr.length - 5} more failures.`;
-        }
-        
-        alert(summaryText);
+        setPreviewData(previewData);
+        setImportSummary({
+          total: data.length,
+          valid: previewData.filter(i => !i._isDuplicate && !i._isInvalid).length,
+          duplicates: previewData.filter(i => i._isDuplicate).length,
+          invalid: previewData.filter(i => i._isInvalid).length
+        });
+        setPreviewModalOpen(true);
         setImporting(false);
-        getSites(setSites); // Refresh the UI
-        e.target.value = ''; // Reset input
-      } catch (error: any) {
-        alert(`Import Process Terminated: ${error.message || "Critical parsing error."}`);
-        console.error(error);
-        setImporting(false);
-        e.target.value = '';
-      }
+      };
+      reader.readAsBinaryString(file);
+      e.target.value = ''; // Reset input
     };
-    reader.readAsArrayBuffer(file);
-  };
+
+    const commitBulkImport = async () => {
+      if (!profile) return;
+      setImporting(true);
+      const toImport = previewData.filter(item => !item._isInvalid && !item._isDuplicate);
+      let successCount = 0;
+      const failedRows: string[] = [];
+
+      for (const row of toImport) {
+        try {
+          const newSite: Partial<Site> = {
+            siteId: row.siteId,
+            name: row.name,
+            status: row.status,
+            lat: row.lat,
+            lng: row.lng,
+            admin: row.admin,
+            technologies: row.technologies,
+            tower: row.tower,
+            power: row.power,
+            transmission: row.transmission,
+            hubSite: row.hubSite,
+            parentSite: row.parentSite,
+            shelterType: row.shelterType,
+            owner: row.owner,
+            leaseContract: row.leaseContract,
+            engineer: row.engineer,
+            environment: row.environment,
+            alarms: row.alarms,
+            lastAudit: row.lastAudit,
+            auditBy: row.auditBy,
+            updatedBy: profile.name,
+            updatedByUserId: profile.uid,
+            updatedByUserName: profile.name,
+          };
+
+          await createSite(newSite);
+          successCount++;
+        } catch (err: any) {
+          failedRows.push(`${row.siteId}: ${err.message}`);
+        }
+      }
+
+      setPreviewModalOpen(false);
+      setImporting(false);
+      alert(`Import completed: ${successCount} sites added.\n${failedRows.length > 0 ? `Failed: ${failedRows.join(', ')}` : ''}`);
+      getSites(setSites);
+    };
 
   const handleSaveComplaint = async (updated: Complaint) => {
     try {
@@ -628,8 +590,8 @@ export default function Sites({ profile }: SitesProps) {
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
           >
-            <Download size={16} />
-            <span>Generate Inventory</span>
+            <Download size={16} className="text-emerald-600" />
+            <span>Download Template</span>
           </button>
           {canEdit && (
             <div className="flex items-center gap-3">
@@ -1115,6 +1077,14 @@ export default function Sites({ profile }: SitesProps) {
         onSave={handleSaveComplaint}
         complaint={editingComplaint}
         sites={sites}
+      />
+
+      <BulkImportPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        onConfirm={commitBulkImport}
+        data={previewData}
+        summary={importSummary}
       />
     </div>
   );

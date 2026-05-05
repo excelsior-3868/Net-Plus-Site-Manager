@@ -21,33 +21,92 @@ app.use(express.json());
 const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Helper to map snake_case to camelCase
 const mapSite = (row: any) => ({
   id: row.id,
-  siteId: row.site_id,
-  name: row.name,
+  siteId: row.site_id || '',
+  name: row.name || '',
   admin: {
-    province: row.province,
-    zone: row.zone,
-    district: row.district,
-    localLevel: row.local_level,
+    province: row.province || '',
+    zone: row.zone || '',
+    district: row.district || '',
+    localLevel: row.local_level || '',
   },
-  status: row.status,
-  lat: parseFloat(row.lat),
-  lng: parseFloat(row.lng),
-  technologies: row.technologies,
-  tower: row.tower,
-  power: row.power,
-  transmission: row.transmission,
-  hubSite: row.hub_site ? 'Yes' : 'No',
-  parentSite: row.parent_site,
-  shelterType: row.shelter_type,
-  owner: row.owner_info,
-  leaseContract: row.lease_contract,
-  engineer: row.engineer_info,
-  environment: row.environment,
-  alarms: row.alarms,
-  lastAudit: row.last_audit,
+  status: row.status || 'Active',
+  lat: parseFloat(row.lat) || 0,
+  lng: parseFloat(row.lng) || 0,
+  technologies: {
+    type: (row.technologies || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+    lteType: (row.lte_bands || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+    lteRRUConfig: (row.lte_rru_config || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+  },
+  tower: {
+    height: row.tower_height || '',
+    type: row.tower_type || '',
+    owner: row.tower_owner || '',
+    foundation: row.tower_foundation || '',
+  },
+  power: {
+    source: (row.power_source || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+    sourceType: row.power_source_type || '',
+    backupDG: row.backup_dg || 'No',
+    backupDGCapacity: row.dg_capacity || '',
+    batteryType: row.battery_type || '',
+    batteryCapacity: row.battery_capacity || '',
+    batteryBanks: row.battery_banks || '',
+    rectifierVendor: row.rectifier_vendor || '',
+    rectifierCapacity: row.rectifier_capacity || '',
+    solarCapacity: row.solar_capacity || '',
+    batteryHealth: parseInt(row.battery_health) || 0,
+    fuelLevel: parseInt(row.fuel_level) || 0,
+    currentLoad: row.current_load || '',
+  },
+  transmission: {
+    type: row.trans_type || 'Fiber',
+    bandwidthCapacity: row.bandwidth || '',
+    vendor: row.trans_vendor || '',
+    path: row.trans_path || '',
+    interface: row.trans_interface || '',
+    indoorTransEquipmentType: row.indoor_trans_type || '',
+    indoorTransEquipmentname: row.indoor_trans_name || '',
+    indoorTransEquipmentVendor: row.indoor_trans_vendor || '',
+    indoorTransEquipmentType2: row.indoor_trans_type_2 || '',
+    indoorTransEquipmentname2: row.indoor_trans_name_2 || '',
+    indoorTransEquipmentVendor2: row.indoor_trans_vendor_2 || '',
+  },
+  hubSite: row.hub_site || 'No',
+  parentSite: row.parent_site || '',
+  shelterType: row.shelter_type || 'Outdoor',
+  owner: {
+    name: row.owner_name || '',
+    contact: row.owner_contact || '',
+    type: row.owner_type || 'Internal',
+    accessCode: row.access_code || '',
+  },
+  leaseContract: {
+    Date: row.lease_date || '',
+    renewalOnYears: row.renewal_years || '',
+    renewalPercent: row.renewal_percent || '',
+  },
+  engineer: {
+    name: row.engineer_name || '',
+    phone: row.engineer_phone || '',
+    employeeId: row.employee_id || '',
+    shift: row.engineer_shift || '',
+  },
+  environment: {
+    temp: parseFloat(row.temp) || 0,
+    humidity: parseFloat(row.humidity) || 0,
+    smokeDetector: !!row.smoke_detector,
+    doorOpen: !!row.door_open,
+  },
+  alarms: (row.alarms || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+  lastAudit: row.last_audit || '',
+  auditBy: row.audit_by || '',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   updatedBy: row.updated_by
@@ -119,12 +178,13 @@ app.post('/api/login', async (req, res) => {
 
 // Sites API
 app.get('/api/sites', async (req, res) => {
+  console.log('Incoming GET /api/sites request');
   try {
     const result = await query('SELECT * FROM sites ORDER BY site_id ASC');
     res.json(result.rows.map(mapSite));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
+  } catch (err: any) {
+    console.error('Database Error (GET /api/sites):', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -144,17 +204,35 @@ app.post('/api/sites', async (req, res) => {
   try {
     const result = await query(
       `INSERT INTO sites (
-        site_id, name, province, zone, district, local_level, status, lat, lng, 
-        technologies, tower, power, transmission, hub_site, parent_site, 
-        shelter_type, owner_info, lease_contract, engineer_info, environment, 
-        alarms, updated_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) 
-      RETURNING id`,
+        site_id, name, status, province, zone, district, local_level, lat, lng,
+        technologies, lte_bands, lte_rru_config, tower_height, tower_type, tower_owner, tower_foundation,
+        power_source, power_source_type, backup_dg, dg_capacity, battery_type, battery_capacity, battery_banks,
+        rectifier_vendor, rectifier_capacity, solar_capacity, battery_health, fuel_level, current_load,
+        trans_type, bandwidth, trans_vendor, trans_path, trans_interface,
+        indoor_trans_type, indoor_trans_name, indoor_trans_vendor,
+        indoor_trans_type_2, indoor_trans_name_2, indoor_trans_vendor_2,
+        hub_site, parent_site, shelter_type, owner_name, owner_contact, owner_type, access_code,
+        lease_date, renewal_years, renewal_percent, engineer_name, engineer_phone, employee_id, engineer_shift,
+        temp, humidity, smoke_detector, door_open, alarms, last_audit, audit_by, updated_by
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+        $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
+        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62
+      ) RETURNING id`,
       [
-        s.siteId, s.name, s.admin?.province, s.admin?.zone, s.admin?.district, s.admin?.localLevel, s.status || 'Active', s.lat, s.lng,
-        s.technologies, s.tower, s.power, s.transmission, s.hubSite === 'Yes', s.parentSite,
-        s.shelterType, s.owner, s.leaseContract, s.engineer, s.environment,
-        s.alarms, s.updatedBy
+        s.siteId, s.name, s.status, s.admin?.province, s.admin?.zone, s.admin?.district, s.admin?.localLevel, s.lat, s.lng,
+        s.technologies?.type?.join(', '), s.technologies?.lteType?.join(', '), s.technologies?.lteRRUConfig?.join(', '),
+        s.tower?.height, s.tower?.type, s.tower?.owner, s.tower?.foundation,
+        s.power?.source?.join(', '), s.power?.sourceType, s.power?.backupDG, s.power?.backupDGCapacity, s.power?.batteryType, s.power?.batteryCapacity, s.power?.batteryBanks,
+        s.power?.rectifierVendor, s.power?.rectifierCapacity, s.power?.solarCapacity, s.power?.batteryHealth, s.power?.fuelLevel, s.power?.currentLoad,
+        s.transmission?.type, s.transmission?.bandwidthCapacity, s.transmission?.vendor, s.transmission?.path, s.transmission?.interface,
+        s.transmission?.indoorTransEquipmentType, s.transmission?.indoorTransEquipmentname, s.transmission?.indoorTransEquipmentVendor,
+        s.transmission?.indoorTransEquipmentType2, s.transmission?.indoorTransEquipmentname2, s.transmission?.indoorTransEquipmentVendor2,
+        s.hubSite, s.parentSite, s.shelterType, s.owner?.name, s.owner?.contact, s.owner?.type, s.owner?.accessCode,
+        s.leaseContract?.Date, s.leaseContract?.renewalOnYears, s.leaseContract?.renewalPercent,
+        s.engineer?.name, s.engineer?.phone, s.engineer?.employeeId, s.engineer?.shift,
+        s.environment?.temp, s.environment?.humidity, s.environment?.smokeDetector, s.environment?.doorOpen,
+        s.alarms?.join(', '), s.lastAudit, s.auditBy, s.updatedBy
       ]
     );
     res.status(201).json({ id: result.rows[0].id });
@@ -169,17 +247,32 @@ app.put('/api/sites/:id', async (req, res) => {
   try {
     await query(
       `UPDATE sites SET 
-        site_id = $1, name = $2, province = $3, zone = $4, district = $5, local_level = $6, 
-        status = $7, lat = $8, lng = $9, technologies = $10, tower = $11, power = $12, 
-        transmission = $13, hub_site = $14, parent_site = $15, shelter_type = $16, 
-        owner_info = $17, lease_contract = $18, engineer_info = $19, environment = $20, 
-        alarms = $21, updated_by = $22, last_audit = $23, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $24`,
+        site_id = $1, name = $2, status = $3, province = $4, zone = $5, district = $6, local_level = $7, lat = $8, lng = $9,
+        technologies = $10, lte_bands = $11, lte_rru_config = $12, tower_height = $13, tower_type = $14, tower_owner = $15, tower_foundation = $16,
+        power_source = $17, power_source_type = $18, backup_dg = $19, dg_capacity = $20, battery_type = $21, battery_capacity = $22, battery_banks = $23,
+        rectifier_vendor = $24, rectifier_capacity = $25, solar_capacity = $26, battery_health = $27, fuel_level = $28, current_load = $29,
+        trans_type = $30, bandwidth = $31, trans_vendor = $32, trans_path = $33, trans_interface = $34,
+        indoor_trans_type = $35, indoor_trans_name = $36, indoor_trans_vendor = $37,
+        indoor_trans_type_2 = $38, indoor_trans_name_2 = $39, indoor_trans_vendor_2 = $40,
+        hub_site = $41, parent_site = $42, shelter_type = $43, owner_name = $44, owner_contact = $45, owner_type = $46, access_code = $47,
+        lease_date = $48, renewal_years = $49, renewal_percent = $50, engineer_name = $51, engineer_phone = $52, employee_id = $53, engineer_shift = $54,
+        temp = $55, humidity = $56, smoke_detector = $57, door_open = $58, alarms = $59, last_audit = $60, audit_by = $61, updated_by = $62,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $63`,
       [
-        s.siteId, s.name, s.admin?.province, s.admin?.zone, s.admin?.district, s.admin?.localLevel, 
-        s.status, s.lat, s.lng, s.technologies, s.tower, s.power, s.transmission, 
-        s.hubSite === 'Yes', s.parentSite, s.shelterType, s.owner, s.leaseContract, 
-        s.engineer, s.environment, s.alarms, s.updatedBy, s.lastAudit, req.params.id
+        s.siteId, s.name, s.status, s.admin?.province, s.admin?.zone, s.admin?.district, s.admin?.localLevel, s.lat, s.lng,
+        s.technologies?.type?.join(', '), s.technologies?.lteType?.join(', '), s.technologies?.lteRRUConfig?.join(', '),
+        s.tower?.height, s.tower?.type, s.tower?.owner, s.tower?.foundation,
+        s.power?.source?.join(', '), s.power?.sourceType, s.power?.backupDG, s.power?.backupDGCapacity, s.power?.batteryType, s.power?.batteryCapacity, s.power?.batteryBanks,
+        s.power?.rectifierVendor, s.power?.rectifierCapacity, s.power?.solarCapacity, s.power?.batteryHealth, s.power?.fuelLevel, s.power?.currentLoad,
+        s.transmission?.type, s.transmission?.bandwidthCapacity, s.transmission?.vendor, s.transmission?.path, s.transmission?.interface,
+        s.transmission?.indoorTransEquipmentType, s.transmission?.indoorTransEquipmentname, s.transmission?.indoorTransEquipmentVendor,
+        s.transmission?.indoorTransEquipmentType2, s.transmission?.indoorTransEquipmentname2, s.transmission?.indoorTransEquipmentVendor2,
+        s.hubSite, s.parentSite, s.shelterType, s.owner?.name, s.owner?.contact, s.owner?.type, s.owner?.accessCode,
+        s.leaseContract?.Date, s.leaseContract?.renewalOnYears, s.leaseContract?.renewalPercent,
+        s.engineer?.name, s.engineer?.phone, s.engineer?.employeeId, s.engineer?.shift,
+        s.environment?.temp, s.environment?.humidity, s.environment?.smokeDetector, s.environment?.doorOpen,
+        s.alarms?.join(', '), s.lastAudit, s.auditBy, s.updatedBy, req.params.id
       ]
     );
     res.json({ success: true });

@@ -64,7 +64,7 @@ export interface Site {
   technologies: {
     type: string[];
     lteType: string[];
-    lte1800RRU: string[];
+    lteRRUConfig: string[];
   };
   tower: {
     height: string;
@@ -128,6 +128,7 @@ export interface Site {
   };
   alarms: string[];
   lastAudit: string;
+  auditBy?: string;
   lastAuditDate?: any;
   createdAt: any;
   updatedAt: any;

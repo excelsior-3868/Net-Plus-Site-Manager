@@ -8,9 +8,8 @@ const sheetName = workbook.SheetNames[0];
 const worksheet = workbook.Sheets[sheetName];
 const data = XLSX.utils.sheet_to_json(worksheet);
 
-if (data.length > 0) {
-    console.log('Excel Headers:', Object.keys(data[0] as object));
-    console.log('Sample Row:', data[0]);
-} else {
-    console.log('No data found in Excel.');
-}
+data.forEach((row: any, i) => {
+    if (['SOL-EV-09', 'LTP-PAT-01'].includes(row['Node ID'])) {
+        console.log(`Row ${i+1}: Node ID = "${row['Node ID']}", Technologies = "${row['Technologies']}"`);
+    }
+});

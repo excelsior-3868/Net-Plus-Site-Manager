@@ -21,7 +21,7 @@ const DEFAULT_SITE: Partial<Site> = {
   status: 'Planned',
   lat: 0,
   lng: 0,
-  technologies: { type: [], lteType: [], lte1800RRU: [] },
+  technologies: { type: [], lteType: [], lteRRUConfig: [] },
   tower: { height: '', type: '', owner: '', foundation: '' },
   power: { 
     source: [], sourceType: '', backupDG: 'No', backupDGCapacity: '', 
@@ -42,7 +42,8 @@ const DEFAULT_SITE: Partial<Site> = {
   owner: { name: '', contact: '', type: 'Internal', accessCode: '' },
   leaseContract: { Date: '', renewalOnYears: '', renewalPercent: '' },
   engineer: { name: '', phone: '', employeeId: '', shift: '' },
-  lastAudit: new Date().toISOString().split('T')[0]
+  lastAudit: new Date().toISOString().split('T')[0],
+  auditBy: ''
 };
 
 function MultiSelectField({ 
@@ -106,7 +107,7 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
            normalized.technologies = {
              type: initialData.technologies,
              lteType: [],
-             lte1800RRU: []
+             lteRRUConfig: []
            };
         }
         if (!normalized.transmission) normalized.transmission = { ...DEFAULT_SITE.transmission };
@@ -383,10 +384,10 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
                         onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lteType: val } })}
                       />
                       <MultiSelectField 
-                        label="LTE 1800 RRU Type"
-                        options={['2T2R', '4T4R']}
-                        selected={formData.technologies?.lte1800RRU || []}
-                        onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lte1800RRU: val } })}
+                        label="LTE RRU Configuration"
+                        options={['2T2R', '4T4R', 'Massive MIMO']}
+                        selected={formData.technologies?.lteRRUConfig || []}
+                        onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lteRRUConfig: val } })}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -735,6 +736,15 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
                           className="w-full rounded-xl border border-ntc-blue/10 p-3 text-sm outline-none font-mono"
                           value={formData.engineer?.shift}
                           onChange={(e) => updateFormData({ engineer: { ...formData.engineer!, shift: e.target.value } })}
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-1.5 border-t border-ntc-blue/5 pt-4">
+                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">System Auditor / Inspector</label>
+                        <input 
+                          placeholder="Name of the person who conducted the last audit"
+                          className="w-full rounded-xl border border-ntc-blue/10 p-3 text-sm outline-none"
+                          value={formData.auditBy}
+                          onChange={(e) => updateFormData({ auditBy: e.target.value })}
                         />
                       </div>
                     </div>
