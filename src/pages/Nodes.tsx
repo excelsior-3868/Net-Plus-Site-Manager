@@ -19,7 +19,10 @@ import {
   Cpu,
   Database,
   FileText,
-  Activity
+  Activity,
+  Server,
+  Sun,
+  Map as MapIcon
 } from 'lucide-react';
 import { Site, UserProfile, Complaint } from '../types';
 import { getSites, deleteSite, createSite } from '../services/siteService';
@@ -528,31 +531,47 @@ export default function Sites({ profile }: SitesProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">
-            {isSolarView ? 'Solar Stations Registry' : 
-             isPlannedView ? 'Planned & Surveyed Registry' : 
-             isTransmissionView ? 'Transmission Registry' :
-             (activeFilter === 'complaints' || isComplaintsView) ? 'Critical Sites Registry (Complaints)' :
-             techFilter ? `${techFilter} Technologies Registry` :
-             'Node Registry'}
-            <span className="ml-3 text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-xl align-middle border border-gray-200/50">
-              {filteredSites.length} Records
-            </span>
-          </h1>
-          <p className="mt-1 text-sm text-ntc-blue/60">
-            {isSolarView || activeFilter === 'solar' 
-             ? 'Filtering for Solar Powered Sites' 
-             : isTransmissionView
-               ? `Nodes equipped with active ${typeFilter === 'All' ? 'transmission' : typeFilter.toLowerCase()} hardware.`
-               : (activeFilter === 'complaints' || isComplaintsView)
-                 ? 'Nodes with active network performance complaints or alarms.'
-                 : techFilter
-                   ? `Filtering for nodes with active ${techFilter} logical capacity.`
-                   : isPlannedView 
-                     ? 'Infrastructure nodes in planning and survey phases.'
-                     : 'Comprehensive list of all BTS/eNodeB assets.'}
-          </p>
+        <div className="flex items-center gap-4">
+          <div className={cn(
+            "flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg",
+            isSolarView ? "bg-amber-500 shadow-amber-500/20" : 
+            isPlannedView ? "bg-amber-500 shadow-amber-500/20" : 
+            isTransmissionView ? "bg-purple-500 shadow-purple-500/20" :
+            (activeFilter === 'complaints' || isComplaintsView) ? "bg-orange-500 shadow-orange-500/20" :
+            "bg-indigo-500 shadow-indigo-500/20"
+          )}>
+            {isSolarView ? <Sun size={24} /> : 
+             isPlannedView ? <MapIcon size={24} /> : 
+             isTransmissionView ? <Cpu size={24} /> :
+             (activeFilter === 'complaints' || isComplaintsView) ? <Bell size={24} /> :
+             <Server size={24} />}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">
+              {isSolarView ? 'Solar Stations Registry' : 
+               isPlannedView ? 'Planned & Surveyed Registry' : 
+               isTransmissionView ? 'Transmission Registry' :
+               (activeFilter === 'complaints' || isComplaintsView) ? 'Critical Sites Registry (Complaints)' :
+               techFilter ? `${techFilter} Technologies Registry` :
+               'Node Registry'}
+              <span className="ml-3 text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-xl align-middle border border-gray-200/50">
+                {filteredSites.length} Records
+              </span>
+            </h1>
+            <p className="mt-1 text-sm text-ntc-blue/60">
+              {isSolarView || activeFilter === 'solar' 
+               ? 'Filtering for Solar Powered Sites' 
+               : isTransmissionView
+                 ? `Nodes equipped with active ${typeFilter === 'All' ? 'transmission' : typeFilter.toLowerCase()} hardware.`
+                 : (activeFilter === 'complaints' || isComplaintsView)
+                   ? 'Nodes with active network performance complaints or alarms.'
+                   : techFilter
+                     ? `Filtering for nodes with active ${techFilter} logical capacity.`
+                     : isPlannedView 
+                       ? 'Infrastructure nodes in planning and survey phases.'
+                       : 'Comprehensive list of all BTS/eNodeB assets.'}
+            </p>
+          </div>
         </div>
 
         {hardwareSummary && hardwareSummary.length > 0 && (

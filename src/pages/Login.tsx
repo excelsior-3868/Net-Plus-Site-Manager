@@ -1,7 +1,8 @@
 import { motion } from 'motion/react';
-import { LogIn, Radio, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { login } from '../services/authService';
 import { useState } from 'react';
+import logo from '../assets/telecom.png';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -34,13 +35,13 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         className="z-10 flex w-full max-w-md flex-col items-center px-8"
       >
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-ntc-blue text-[#E4E3E0]">
-            <Radio size={32} />
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 shadow-xl shadow-black/5">
+            <img src={logo} alt="Netsplus" className="h-full w-full object-contain" />
           </div>
           <div>
-            <h1 className="text-2xl font-medium tracking-tight">NetPulse</h1>
-            <p className="text-[10px] font-mono uppercase tracking-[0.2em] opacity-40">BTS Management System</p>
+            <h1 className="text-3xl font-black tracking-tighter text-ntc-blue leading-none">NETSPLUS</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ntc-blue/40 mt-1">Manager</p>
           </div>
         </div>
 

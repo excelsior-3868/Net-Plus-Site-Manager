@@ -16,12 +16,14 @@ import {
   Database,
   Cpu,
   Sun,
+  LayoutDashboard,
   X
 } from 'lucide-react';
 import { getSites } from '../services/siteService';
 import { getComplaints } from '../services/complaintService';
 import { cn } from '../lib/utils';
 import { Complaint, Site, UserProfile } from '../types';
+// Component: Dashboard - Modernized with Colorful Icons
 
 interface DashboardProps {
   profile: UserProfile | null;
@@ -155,9 +157,14 @@ export default function Dashboard({ profile }: DashboardProps) {
     <div className="space-y-10">
       {/* Header Section */}
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-           <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network Dashboard</h1>
-           <p className="mt-1 text-sm text-ntc-blue/60">Infrastructure metrics & asset distributions.</p>
+        <div className="flex items-center gap-4">
+           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-lg shadow-blue-500/20">
+              <LayoutDashboard size={24} />
+           </div>
+           <div>
+              <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network Dashboard</h1>
+              <p className="mt-1 text-sm text-ntc-blue/60">Infrastructure metrics & asset distributions.</p>
+           </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">

@@ -11,7 +11,8 @@ import {
   Download,
   User,
   Phone,
-  Plus
+  Plus,
+  Bell
 } from 'lucide-react';
 import { Site, Complaint, UserProfile } from '../types';
 import { cn } from '../lib/utils';
@@ -127,9 +128,14 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-           <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network & Site Complaints</h1>
-           <p className="mt-1 text-sm text-ntc-blue/60">Manage ticket registry for general network areas and specific sites.</p>
+        <div className="flex items-center gap-4">
+           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/20">
+              <Bell size={24} />
+           </div>
+           <div>
+              <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network & Site Complaints</h1>
+              <p className="mt-1 text-sm text-ntc-blue/60">Manage ticket registry for general network areas and specific sites.</p>
+           </div>
         </div>
         
         <div className="flex items-center gap-3">

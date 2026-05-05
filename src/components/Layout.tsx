@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { logout } from '../services/authService';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import logo from '../assets/telecom.png';
 import { cn } from '../lib/utils';
 
 interface LayoutProps {
@@ -29,14 +30,20 @@ export default function Layout({ profile }: LayoutProps) {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
 
   const navItems = [
-    { label: 'Network Dashboard', icon: LayoutDashboard, path: '/', role: 'viewer' },
-    { label: 'Provincial Dashboard', icon: Globe, path: '/provincial', role: 'viewer' },
-    { label: 'Node Registry', icon: Server, path: '/nodes', role: 'viewer' },
-    { label: 'Transmission Registry', icon: Cpu, path: '/transmission-registry', role: 'viewer' },
-    { label: 'Planned & Surveyed', icon: Map, path: '/planned-sites', role: 'viewer' },
-    { label: 'Network Complains', icon: Bell, path: '/complaints', role: 'viewer' },
-    { label: 'Authorized Users', icon: Users, path: '/users', role: 'admin' },
+    { label: 'Network Dashboard', icon: LayoutDashboard, path: '/', role: 'viewer', color: 'text-blue-500' },
+    { label: 'Provincial Dashboard', icon: Globe, path: '/provincial', role: 'viewer', color: 'text-emerald-500' },
+    { label: 'Node Registry', icon: Server, path: '/nodes', role: 'viewer', color: 'text-indigo-500' },
+    { label: 'Transmission Registry', icon: Cpu, path: '/transmission-registry', role: 'viewer', color: 'text-purple-500' },
+    { label: 'Planned & Surveyed', icon: Map, path: '/planned-sites', role: 'viewer', color: 'text-amber-500' },
+    { label: 'Network Complains', icon: Bell, path: '/complaints', role: 'viewer', color: 'text-orange-500' },
+    { label: 'Authorized Users', icon: Users, path: '/users', role: 'admin', color: 'text-rose-500' },
   ];
+
+  useEffect(() => {
+    const currentItem = navItems.find(item => item.path === location.pathname);
+    const pageName = currentItem?.label || 'Dashboard';
+    document.title = `${pageName} | Netsplus Manager`;
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -52,14 +59,13 @@ export default function Layout({ profile }: LayoutProps) {
       >
         <div className="flex h-24 items-center px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-ntc-blue text-white shadow-lg shadow-ntc-blue/30">
-              <Globe size={28} />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-lg shadow-black/5 border border-gray-100">
+              <img src={logo} alt="Netsplus" className="h-full w-full object-contain" />
             </div>
             {isSidebarOpen && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-ntc-blue/30">Nepal Telecom</p>
-                <h2 className="text-xl font-bold tracking-tight text-ntc-blue leading-tight">NetPulse</h2>
-                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-ntc-blue/30">Site Manager</p>
+                <h2 className="text-xl font-black tracking-tighter text-ntc-blue leading-none">NETSPLUS</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ntc-blue/40 mt-1">Manager</p>
               </motion.div>
             )}
           </div>
@@ -87,7 +93,7 @@ export default function Layout({ profile }: LayoutProps) {
                     : "text-gray-500 hover:bg-ntc-blue/[0.04] hover:text-ntc-blue"
                 )}
               >
-                <item.icon size={20} className={isActive ? "text-white" : "text-gray-400 group-hover:text-ntc-blue"} />
+                <item.icon size={20} className={cn(isActive ? "text-white" : cn("transition-colors", item.color))} />
                 {isSidebarOpen && <span className="text-sm font-bold tracking-tight">{item.label}</span>}
                 {isActive && isSidebarOpen && (
                   <motion.div layoutId="activeDot" className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />

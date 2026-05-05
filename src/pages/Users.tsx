@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { cn } from '../lib/utils';
-import { Shield, ShieldAlert, ShieldCheck, Trash2, Mail, Calendar, User as UserIcon } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Trash2, Mail, Calendar, User as UserIcon, Users as UsersIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getCurrentUser } from '../services/authService';
 
@@ -62,9 +62,14 @@ export default function Users() {
   return (
     <div className="space-y-8">
       <div className="rounded-3xl border border-ntc-blue/5 bg-white shadow-xl shadow-black/5 overflow-hidden">
-        <div className="border-b border-ntc-blue/5 p-6">
-          <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Access Control Matrix</h1>
-          <p className="mt-1 text-sm text-ntc-blue/60 uppercase tracking-widest opacity-40">Identity & Role-Based Access Management</p>
+        <div className="border-b border-ntc-blue/5 p-6 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+             <UsersIcon size={24} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Access Control Matrix</h1>
+            <p className="mt-1 text-sm text-ntc-blue/60 uppercase tracking-widest opacity-40">Identity & Role-Based Access Management</p>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
