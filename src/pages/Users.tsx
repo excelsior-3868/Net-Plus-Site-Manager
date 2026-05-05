@@ -63,8 +63,8 @@ export default function Users() {
     <div className="space-y-8">
       <div className="rounded-3xl border border-ntc-blue/5 bg-white shadow-xl shadow-black/5 overflow-hidden">
         <div className="border-b border-ntc-blue/5 p-6">
-          <h2 className="text-xl font-semibold tracking-tight">Access Control Matrix</h2>
-          <p className="text-[10px] uppercase tracking-widest opacity-40">Identity & Role-Based Access Management</p>
+          <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Access Control Matrix</h1>
+          <p className="mt-1 text-sm text-ntc-blue/60 uppercase tracking-widest opacity-40">Identity & Role-Based Access Management</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -134,7 +134,7 @@ export default function Users() {
                   <td className="px-6 py-5">
                     <button 
                       onClick={() => deleteUser(user.uid)}
-                      disabled={user.uid === auth.currentUser?.uid}
+                      disabled={user.uid === currentUser?.uid}
                       className="rounded-lg p-2 text-red-600 opacity-40 transition-all hover:bg-red-50 hover:opacity-100 disabled:invisible"
                     >
                       <Trash2 size={16} />

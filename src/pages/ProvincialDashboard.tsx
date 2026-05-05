@@ -228,8 +228,8 @@ export default function ProvincialDashboard({ profile }: { profile: UserProfile 
               <ChevronRight size={20} className="rotate-180 text-ntc-blue" />
             </button>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-ntc-blue">{selectedProvince} Province</h2>
-              <p className="text-sm text-ntc-blue/60">Regional network infrastructure metrics.</p>
+              <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">{selectedProvince} Province</h1>
+              <p className="mt-1 text-sm text-ntc-blue/60">Regional network infrastructure metrics.</p>
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-gray-100 bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-emerald-500">
@@ -402,8 +402,8 @@ export default function ProvincialDashboard({ profile }: { profile: UserProfile 
     <div className="space-y-10 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-ntc-blue">Regional Hierarchy</h2>
-          <p className="text-sm text-ntc-blue/60">Select a province to view specialized infrastructure metrics.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Regional Hierarchy</h1>
+          <p className="mt-1 text-sm text-ntc-blue/60">Select a province to view specialized infrastructure metrics.</p>
         </div>
         <button 
           onClick={() => {

@@ -128,8 +128,8 @@ const Complaints: React.FC<{ profile: UserProfile | null }> = ({ profile }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-           <h2 className="text-2xl font-semibold tracking-tight text-ntc-blue">Network & Site Complaints</h2>
-           <p className="text-sm text-ntc-blue/60">Manage ticket registry for general network areas and specific sites.</p>
+           <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network & Site Complaints</h1>
+           <p className="mt-1 text-sm text-ntc-blue/60">Manage ticket registry for general network areas and specific sites.</p>
         </div>
         
         <div className="flex items-center gap-3">

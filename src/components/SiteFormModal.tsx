@@ -11,7 +11,7 @@ interface SiteFormModalProps {
   onClose: () => void;
   initialData?: Site;
   profile: UserProfile | null;
-  initialTab?: 'general' | 'technical' | 'infrastructure' | 'contact';
+  initialTab?: 'general' | 'technical' | 'power' | 'transmission' | 'infrastructure' | 'contact';
 }
 
 const DEFAULT_SITE: Partial<Site> = {
@@ -93,7 +93,7 @@ function MultiSelectField({
 export default function SiteFormModal({ isOpen, onClose, initialData, profile, initialTab }: SiteFormModalProps) {
   const [formData, setFormData] = useState<Partial<Site>>(DEFAULT_SITE);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'technical' | 'infrastructure' | 'contact'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'technical' | 'power' | 'transmission' | 'infrastructure' | 'contact'>('general');
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
@@ -141,8 +141,8 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
     
     const isEditing = !!initialData?.id;
     const confirmMessage = isEditing 
-      ? "Confirm Record Modification: Are you sure you want to apply these changes to the network asset database?"
-      : "Commit New Node: Are you sure you want to register this new asset into the system?";
+      ? "CRITICAL DATABASE OPERATION: Are you absolutely certain you want to commit these modifications to the network asset registry? This action will be permanently recorded in the audit trail."
+      : "NEW ASSET REGISTRATION: Proceed with committing this node to the production environment?";
 
     if (!window.confirm(confirmMessage)) return;
 

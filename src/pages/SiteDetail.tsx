@@ -33,7 +33,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
-  const [initialModalTab, setInitialModalTab] = useState<'general' | 'technical' | 'infrastructure' | 'contact'>('general');
+  const [initialModalTab, setInitialModalTab] = useState<'general' | 'technical' | 'power' | 'transmission' | 'infrastructure' | 'contact'>('general');
   const [isComplaintModalOpen, setComplaintModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('Active');
   const [editingComplaint, setEditingComplaint] = useState<Complaint | undefined>(undefined);
@@ -76,12 +76,13 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
   const handleConfirmDelete = async () => {
     if (!site?.id) return;
-    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this asset record? This cannot be undone.")) {
+    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently DESTRUCT this asset record? This operation is irreversible and will be logged in the audit trail.")) {
       try {
         await deleteSite(site.id);
         navigate('/nodes');
       } catch (error) {
-        console.error("Delete failed", error);
+        console.error("Purge operation failed", error);
+        alert("Operation Denied: The system encountered a security or database error during the purge attempt.");
       }
     }
   };
@@ -297,17 +298,17 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                      <div className="flex items-center gap-2">
                        <Zap size={14} /> Power Management
                      </div>
-                     {canEdit && (
-                       <button 
-                         onClick={() => {
-                           setInitialModalTab('technical');
-                           setModalOpen(true);
-                         }}
-                         className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
-                       >
-                         <Edit2 size={10} /> Edit
-                       </button>
-                     )}
+                      {canEdit && (
+                        <button 
+                          onClick={() => {
+                            setInitialModalTab('power');
+                            setModalOpen(true);
+                          }}
+                          className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
+                        >
+                          <Edit2 size={10} /> Edit
+                        </button>
+                      )}
                    </h4>
                     <div className="space-y-4 rounded-3xl border border-[#141414]/5 p-6">
                       <div className="grid grid-cols-2 gap-y-4">
@@ -357,8 +358,21 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
               {/* Operations */}
               <div className="space-y-6">
                 <section>
-                   <h4 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40">
-                     <Database size={14} /> Network Connectivity
+                   <h4 className="mb-4 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 group/header">
+                     <div className="flex items-center gap-2">
+                       <Database size={14} /> Network Connectivity
+                     </div>
+                     {canEdit && (
+                       <button 
+                         onClick={() => {
+                           setInitialModalTab('transmission');
+                           setModalOpen(true);
+                         }}
+                         className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
+                       >
+                         <Edit2 size={10} /> Edit
+                       </button>
+                     )}
                    </h4>
                     <div className="space-y-4 rounded-3xl border border-[#141414]/5 p-6">
                       <div className="grid grid-cols-2 gap-y-4">

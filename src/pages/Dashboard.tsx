@@ -157,7 +157,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
            <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">Network Dashboard</h1>
-           <p className="mt-1 text-gray-500">Infrastructure metrics & asset distributions.</p>
+           <p className="mt-1 text-sm text-ntc-blue/60">Infrastructure metrics & asset distributions.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">

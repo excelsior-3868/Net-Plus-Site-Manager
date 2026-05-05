@@ -53,6 +53,30 @@ const mapSite = (row: any) => ({
   updatedBy: row.updated_by
 });
 
+const mapComplaint = (row: any) => ({
+  id: row.id,
+  ticketNumber: row.ticket_number,
+  complaintName: row.complaint_name,
+  complainerName: row.complainer_name,
+  complainerContact: row.complainer_contact,
+  province: row.province,
+  zone: row.zone,
+  district: row.district,
+  localLevel: row.local_level,
+  lat: parseFloat(row.lat),
+  lng: parseFloat(row.lng),
+  siteId: row.site_id,
+  complaintType: row.complaint_type,
+  status: row.status,
+  comments: row.comments,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  createdByUserId: row.created_by_user_id,
+  createdByUserName: row.created_by_user_name,
+  updatedByUserId: row.updated_by_user_id,
+  updatedByUserName: row.updated_by_user_name
+});
+
 // Auth API
 app.post('/api/login', async (req, res) => {
   const { employeeId, password } = req.body;
@@ -134,9 +158,9 @@ app.post('/api/sites', async (req, res) => {
       ]
     );
     res.status(201).json({ id: result.rows[0].id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
+  } catch (err: any) {
+    console.error('Database Error (POST /api/sites):', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -159,9 +183,9 @@ app.put('/api/sites/:id', async (req, res) => {
       ]
     );
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
+  } catch (err: any) {
+    console.error('Database Error (PUT /api/sites):', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -179,24 +203,7 @@ app.delete('/api/sites/:id', async (req, res) => {
 app.get('/api/complaints', async (req, res) => {
     try {
       const result = await query('SELECT * FROM complaints ORDER BY created_at DESC');
-      res.json(result.rows.map(row => ({
-        id: row.id,
-        ticketNumber: row.ticket_number,
-        complaintName: row.complaint_name,
-        complainerName: row.complainer_name,
-        complainerContact: row.complainer_contact,
-        province: row.province,
-        zone: row.zone,
-        district: row.district,
-        localLevel: row.local_level,
-        lat: parseFloat(row.lat),
-        lng: parseFloat(row.lng),
-        siteId: row.site_id,
-        complaintType: row.complaint_type,
-        status: row.status,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      })));
+      res.json(result.rows.map(mapComplaint));
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Database error' });
@@ -218,9 +225,9 @@ app.post('/api/complaints', async (req, res) => {
       ]
     );
     res.status(201).json({ id: result.rows[0].id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
+  } catch (err: any) {
+    console.error('Database Error (POST /api/complaints):', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -253,7 +260,7 @@ app.delete('/api/complaints/:id', async (req, res) => {
 app.get('/api/sites/:siteId/complaints', async (req, res) => {
   try {
     const result = await query('SELECT * FROM complaints WHERE site_id = $1 ORDER BY created_at DESC', [req.params.siteId]);
-    res.json(result.rows);
+    res.json(result.rows.map(mapComplaint));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Database error' });

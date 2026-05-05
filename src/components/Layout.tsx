@@ -145,10 +145,9 @@ export default function Layout({ profile }: LayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto overflow-x-hidden">
-        <div className="p-10 pt-16">
+        <div className="p-10 pt-8">
           <AnimatePresence mode="wait">
             <motion.div
-              key={location.pathname}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

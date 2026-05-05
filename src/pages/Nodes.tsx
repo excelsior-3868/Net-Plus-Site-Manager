@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Cpu,
   Database,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react';
 import { Site, UserProfile, Complaint } from '../types';
 import { getSites, deleteSite, createSite } from '../services/siteService';
@@ -143,13 +144,10 @@ export default function Sites({ profile }: SitesProps) {
   useEffect(() => {
     getSites(setSites);
     getComplaints(setComplaints);
-  }, []);
-
-  useEffect(() => {
     if (provinceParam) {
       setFilterProvince(provinceParam);
     }
-  }, [provinceParam]);
+  }, []);
 
   const handleGenerateReport = () => {
     if (filteredSites.length === 0) {
@@ -243,43 +241,75 @@ export default function Sites({ profile }: SitesProps) {
   };
 
   const handleBulkImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    // Starting import process
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Confirm Bulk Data Injection: Are you sure you want to commit these records to the database?")) return;
-    if (!profile) return;
+    console.log(`Starting bulk import for file: ${file.name}`);
+
+    if (!window.confirm(`Bulk Import Initiation: Are you sure you want to attempt importing records from "${file.name}"?`)) {
+      e.target.value = '';
+      return;
+    }
+
+    if (!profile) {
+      alert("System Error: Your administrative profile is not yet loaded. Please wait a moment and try again.");
+      e.target.value = '';
+      return;
+    }
 
     setImporting(true);
-
     const reader = new FileReader();
+    
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const dataBuffer = evt.target?.result;
+        if (!dataBuffer) throw new Error("The system encountered an error reading the local file buffer.");
+        
+        const wb = XLSX.read(dataBuffer, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
 
-        const failedRowsArr: {row: number, id: string, error: string}[] = [];
-        let duplicateCount = 0;
-        let invalidCount = 0;
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          alert("Import Canceled: The selected Excel file contains no valid data rows or is incorrectly formatted.");
+          setImporting(false);
+          return;
+        }
 
+        console.log(`Successfully parsed ${data.length} rows.`);
+        
         const getVal = (row: any, ...keys: string[]) => {
-          for (const key of keys) {
-            if (row[key] !== undefined && row[key] !== null) return row[key];
-            const lowerKey = key.toLowerCase();
-            const matchingKey = Object.keys(row).find(k => k.toLowerCase() === lowerKey);
-            if (matchingKey) return row[matchingKey];
+          const rowKeys = Object.keys(row);
+          for (const k of keys) {
+            const searchKey = k.toLowerCase().trim();
+            if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+              return typeof row[k] === 'string' ? row[k].trim() : row[k];
+            }
+            const foundKey = rowKeys.find(rk => rk.toLowerCase().trim() === searchKey);
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+              return typeof row[foundKey] === 'string' ? row[foundKey].trim() : row[foundKey];
+            }
           }
           return undefined;
         };
 
-        const toImport = data.filter(row => {
-          const siteId = getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID');
-          if (!siteId) {
+        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()).filter(Boolean));
+        const failedRowsArr: { row: number; id: string; error: string }[] = [];
+        let duplicateCount = 0;
+        let invalidCount = 0;
+
+        const toImport = data.filter((row) => {
+          const idCandidates = ['Node ID', 'siteId', 'NodeID', 'Site ID', 'ID', 'SiteID', 'SiteRef', 'Asset ID', 'Site_ID'];
+          const rowSiteIdRaw = getVal(row, ...idCandidates);
+          
+          if (!rowSiteIdRaw) {
             invalidCount++;
             return false;
           }
-          if (sites.some(s => s.siteId === String(siteId))) {
+
+          const rowSiteId = String(rowSiteIdRaw).toLowerCase().trim();
+          if (existingNodeIds.has(rowSiteId)) {
             duplicateCount++;
             return false;
           }
@@ -287,55 +317,143 @@ export default function Sites({ profile }: SitesProps) {
         });
 
         if (toImport.length === 0) {
-          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}`);
+          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}\n\nPlease ensure your Node IDs are unique and the column header matches "Node ID".`);
           setImporting(false);
           return;
         }
 
+        console.log(`Executing batch import of ${toImport.length} new records...`);
+
         const results = await Promise.all(toImport.map(async (row) => {
           const originalIndex = data.indexOf(row);
           const rowNumber = originalIndex + 2;
-          const siteId = String(getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID') || 'Unknown');
+          const siteId = String(getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID', 'Asset ID') || 'Unknown');
 
           try {
-            const tryParse = (val: any) => {
-              if (!val) return {};
-              try { return typeof val === 'string' ? JSON.parse(val) : val; } 
-              catch(e) { return {}; }
-            };
+            let lat = 0, lng = 0;
+            const coords = getVal(row, 'Coordinates', 'Coords', 'Location', 'Lat/Long', 'Lat,Long', 'GPS');
+            if (typeof coords === 'string' && coords.includes(',')) {
+              const parts = coords.split(',').map(p => parseFloat(p.trim()));
+              if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                lat = parts[0];
+                lng = parts[1];
+              }
+            } else {
+              lat = parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0;
+              lng = parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0;
+            }
+
+            const nodeStatus = (getVal(row, 'Status', 'status', 'Site Status') || 'Active') as any;
 
             const newSite: Partial<Site> = {
               siteId: siteId,
               name: String(getVal(row, 'Site Name', 'Name', 'SiteName', 'Site_Name') || 'Unnamed Site'),
-              status: (getVal(row, 'Status', 'status', 'Site Status') || 'Planned') as any,
-              lat: parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0,
-              lng: parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0,
+              status: nodeStatus,
+              lat,
+              lng,
               admin: {
                 province: String(getVal(row, 'Province', 'state', 'Region') || ''),
                 zone: String(getVal(row, 'Zone', 'SubRegion') || ''),
                 district: String(getVal(row, 'District', 'City') || ''),
                 localLevel: String(getVal(row, 'Local Level', 'LocalLevel', 'Municipality', 'Area') || ''),
               },
-              technologies: tryParse(row.technologies) || { type: [], lteType: [], lte1800RRU: [] },
-              tower: tryParse(row.tower) || { height: '', type: '', owner: '', foundation: '' },
-              power: tryParse(row.power) || { source: [], sourceType: '', backupDG: 'No', batteryHealth: 100 },
-              transmission: tryParse(row.transmission) || { type: '', bandwidthCapacity: '' },
-              hubSite: (row.hub_site === 'Yes' || row.hub_site === true) ? 'Yes' : 'No',
-              parentSite: String(getVal(row, 'Parent Site') || ''),
-              shelterType: String(getVal(row, 'Shelter Type') || ''),
-              owner: tryParse(row.owner_info) || { name: '', contact: '', type: 'Internal' },
-              leaseContract: tryParse(row.lease_contract) || { Date: '', renewalPercent: '' },
-              engineer: tryParse(row.engineer_info) || { name: '', phone: '' },
-              environment: tryParse(row.environment) || {},
-              alarms: Array.isArray(tryParse(row.alarms)) ? tryParse(row.alarms) : [],
-              lastAudit: String(getVal(row, 'Last Audit', 'last_audit') || ''),
+              technologies: {
+                type: String(getVal(row, 'Technologies', 'Technology', 'Network') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lteType: String(getVal(row, 'LTE Bands', 'LTEBands', 'Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lte1800RRU: String(getVal(row, 'LTE RRU Config', 'RRUConfig') || '').split(',').map(s => s.trim()).filter(Boolean),
+              },
+              tower: {
+                height: String(getVal(row, 'Tower Height', 'Height', 'TowerHeight') || ''),
+                type: String(getVal(row, 'Tower Type', 'Type', 'TowerType') || ''),
+                owner: String(getVal(row, 'Tower Owner', 'Tower_Owner') || ''),
+                foundation: String(getVal(row, 'Foundation', 'Tower_Foundation') || ''),
+              },
+              power: {
+                source: String(getVal(row, 'Power Source', 'Source', 'MainPower') || '').split(',').map(s => s.trim()).filter(Boolean),
+                sourceType: String(getVal(row, 'Connection Type', 'PowerType') || ''),
+                backupDG: String(getVal(row, 'Backup DG', 'DG_Available') || 'No'),
+                backupDGCapacity: String(getVal(row, 'DG Capacity', 'DG_KVA') || ''),
+                batteryType: String(getVal(row, 'Battery Type', 'BatteryType') || ''),
+                batteryCapacity: String(getVal(row, 'Battery Capacity', 'Ah') || ''),
+                batteryBanks: String(getVal(row, 'Battery Banks', 'Banks') || ''),
+                rectifierVendor: String(getVal(row, 'Rectifier Vendor', 'Rect_Vendor') || ''),
+                rectifierCapacity: String(getVal(row, 'Rectifier Capacity', 'Rect_Amp') || ''),
+                solarCapacity: String(getVal(row, 'Solar Capacity', 'Solar_kWp') || ''),
+                batteryHealth: parseInt(String(getVal(row, 'Battery Health (%)', 'Battery Health', 'Health %') || '100')) || 100,
+                fuelLevel: parseInt(String(getVal(row, 'Fuel Level (%)', 'Fuel Level', 'Fuel %') || '100')) || 100,
+                currentLoad: String(getVal(row, 'Current Load', 'Load_kW', 'Load') || ''),
+              },
+              transmission: {
+                type: String(getVal(row, 'Trans Type', 'Media', 'Transmission') || 'Fiber'),
+                bandwidthCapacity: String(getVal(row, 'Bandwidth', 'Capacity') || ''),
+                vendor: String(getVal(row, 'Trans Vendor', 'Vendor') || ''),
+                path: String(getVal(row, 'Trans Path', 'Route') || ''),
+                interface: String(getVal(row, 'Trans Interface', 'Port') || ''),
+                indoorTransEquipmentType: String(getVal(row, 'Indoor Trans Type', 'Hardware') || 'Router'),
+                indoorTransEquipmentname: String(getVal(row, 'Indoor Trans Name', 'Model') || ''),
+                indoorTransEquipmentVendor: String(getVal(row, 'Indoor Trans Vendor', 'HW_Vendor') || ''),
+                indoorTransEquipmentType2: String(getVal(row, 'Indoor Trans Type 2') || ''),
+                indoorTransEquipmentname2: String(getVal(row, 'Indoor Trans Name 2') || ''),
+                indoorTransEquipmentVendor2: String(getVal(row, 'Indoor Trans Vendor 2') || ''),
+              },
+              hubSite: String(getVal(row, 'Hub Site', 'isHub') || 'No') as any,
+              parentSite: String(getVal(row, 'Parent Site', 'ParentNode') || ''),
+              shelterType: String(getVal(row, 'Shelter Type', 'Shelter') || 'Outdoor'),
+              owner: {
+                name: String(getVal(row, 'Owner Name', 'AssetOwner') || ''),
+                contact: String(getVal(row, 'Owner Contact') || ''),
+                type: String(getVal(row, 'Owner Type') || 'Internal'),
+                accessCode: String(getVal(row, 'Access Code') || ''),
+              },
+              leaseContract: {
+                Date: String(getVal(row, 'Lease Date', 'ContractDate') || ''),
+                renewalOnYears: String(getVal(row, 'Renewal Years') || ''),
+                renewalPercent: String(getVal(row, 'Renewal Percent') || ''),
+              },
+              engineer: {
+                name: String(getVal(row, 'Engineer Name', 'FieldEngineer') || ''),
+                phone: String(getVal(row, 'Engineer Phone', 'Contact') || ''),
+                employeeId: String(getVal(row, 'Employee ID', 'EmpID') || ''),
+                shift: String(getVal(row, 'Engineer Shift', 'Shift') || ''),
+              },
+              lastAudit: String(getVal(row, 'Last Audit', 'AuditDate') || new Date().toLocaleDateString()),
+              environment: {
+                temp: String(getVal(row, 'Temp (C)', 'Temperature') || ''),
+                humidity: String(getVal(row, 'Humidity (%)', 'Humidity') || ''),
+                smokeDetector: String(getVal(row, 'Smoke Detector', 'Smoke') || 'No'),
+                doorOpen: String(getVal(row, 'Door Open', 'Door') || 'No'),
+              },
+              alarms: String(getVal(row, 'Active Alarms', 'Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
               updatedBy: profile.name,
               updatedByUserId: profile.uid,
               updatedByUserName: profile.name,
             };
+
             await createSite(newSite);
+
+            // Automatically trigger complaint if battery health is below 50%
+            if (newSite.power?.batteryHealth !== undefined && newSite.power.batteryHealth < 50) {
+              const ticketNumber = `ALAM-BAT-${Math.floor(1000 + Math.random() * 9000)}`;
+              await createComplaint({
+                ticketNumber,
+                type: 'Site',
+                complaintName: `Low Battery Health Alarm: ${newSite.power?.batteryHealth}%`,
+                complainerName: 'System Monitor',
+                complainerContact: 'Auto-Generated',
+                province: newSite.admin?.province || '',
+                zone: newSite.admin?.zone || '',
+                district: newSite.admin?.district || '',
+                localLevel: newSite.admin?.localLevel || '',
+                lat: newSite.lat || 0,
+                lng: newSite.lng || 0,
+                siteId: newSite.siteId,
+                complaintType: 'SITE COMPLAINT',
+                status: 'Open'
+              });
+            }
             return true;
           } catch (err: any) {
+            console.error(`Row ${rowNumber} failed:`, err);
             failedRowsArr.push({ row: rowNumber, id: siteId, error: err.message || String(err) });
             return false;
           }
@@ -344,19 +462,23 @@ export default function Sites({ profile }: SitesProps) {
         const successCount = results.filter(r => r === true).length;
         let summaryText = `Bulk Import Summary:\n\n✅ Success: ${successCount}\n⏭️ Duplicates Skipped: ${duplicateCount}\n⚠️ Invalid ID: ${invalidCount}\n`;
         if (failedRowsArr.length > 0) {
-          summaryText += `\n❌ Failed: ${failedRowsArr.length}\n`;
+          summaryText += `\n❌ Failed Transactions: ${failedRowsArr.length}\n`;
           failedRowsArr.slice(0, 5).forEach(f => summaryText += `- Row ${f.row} [${f.id}]: ${f.error}\n`);
+          if (failedRowsArr.length > 5) summaryText += `... and ${failedRowsArr.length - 5} more failures.`;
         }
+        
         alert(summaryText);
         setImporting(false);
-        getSites(setSites); // Refresh
+        getSites(setSites); // Refresh the UI
+        e.target.value = ''; // Reset input
       } catch (error: any) {
-        alert("Import Process Failed: Critical parsing error.");
+        alert(`Import Process Terminated: ${error.message || "Critical parsing error."}`);
         console.error(error);
         setImporting(false);
+        e.target.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleSaveComplaint = async (updated: Complaint) => {
@@ -407,7 +529,7 @@ export default function Sites({ profile }: SitesProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ntc-blue">
+          <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">
             {isSolarView ? 'Solar Stations Registry' : 
              isPlannedView ? 'Planned & Surveyed Registry' : 
              isTransmissionView ? 'Transmission Registry' :
@@ -417,8 +539,8 @@ export default function Sites({ profile }: SitesProps) {
             <span className="ml-3 text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-xl align-middle border border-gray-200/50">
               {filteredSites.length} Records
             </span>
-          </h2>
-          <p className="text-sm text-ntc-blue/60">
+          </h1>
+          <p className="mt-1 text-sm text-ntc-blue/60">
             {isSolarView || activeFilter === 'solar' 
              ? 'Filtering for Solar Powered Sites' 
              : isTransmissionView
