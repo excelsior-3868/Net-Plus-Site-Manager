@@ -15,7 +15,6 @@ export interface UserProfile {
   role: UserRole;
   active: boolean;
   createdAt: string;
-  employeeId?: string;
 }
 
 export interface Complaint {
@@ -29,7 +28,6 @@ export interface Complaint {
   zone: string;
   district: string;
   localLevel: string;
-  complaintType: 'SITE COMPLAINT' | 'NETWORK COMPLAINT';
   lat: number;
   lng: number;
   siteId?: string;
@@ -65,7 +63,7 @@ export interface Site {
   technologies: {
     type: string[];
     lteType: string[];
-    lteRRUConfig: string[];
+    lte1800RRU: string[];
   };
   tower: {
     height: string;
@@ -135,17 +133,10 @@ export interface Site {
   };
   alarms: string[];
   lastAudit: string;
-  auditBy?: string;
   lastAuditDate?: any;
   createdAt: any;
   updatedAt: any;
   updatedBy?: string;
   updatedByUserId?: string;
   updatedByUserName?: string;
-  logicalSites?: {
-    g2?: boolean;
-    g3?: boolean;
-    g4?: boolean;
-    g5?: boolean;
-  };
 }

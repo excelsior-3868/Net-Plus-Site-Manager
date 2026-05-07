@@ -130,7 +130,7 @@ export default function BulkImportPreviewModal({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-gray-700">{item.admin?.district || 'N/A'}</span>
+                          <span className="text-[10px] font-bold text-gray-700">{item.admin?.district || 'N/A'}{item.admin?.wardToleArea ? `, ${item.admin.wardToleArea}` : ''}</span>
                           <span className="text-[9px] text-gray-400 uppercase tracking-tighter">{item.admin?.province || 'N/A'}</span>
                         </div>
                       </td>

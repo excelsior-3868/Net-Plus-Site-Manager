@@ -21,7 +21,7 @@ const DEFAULT_SITE: Partial<Site> = {
   status: 'Planned',
   lat: 0,
   lng: 0,
-  technologies: { type: [], lteType: [], lteRRUConfig: [] },
+  technologies: { type: [], lteType: [], lte1800RRU: [] },
   tower: { height: '', type: '', owner: '', foundation: '', fencingDoneByNT: false },
   power: { 
     source: [], sourceType: '', backupDG: 'No', backupDGCapacity: '', 
@@ -44,8 +44,7 @@ const DEFAULT_SITE: Partial<Site> = {
   owner: { name: '', contact: '', type: 'Internal', accessCode: '' },
   leaseContract: { Date: '', renewalOnYears: '', renewalPercent: '' },
   engineer: { name: '', phone: '', employeeId: '', shift: '' },
-  lastAudit: new Date().toISOString().split('T')[0],
-  auditBy: ''
+  lastAudit: new Date().toISOString().split('T')[0]
 };
 
 function MultiSelectField({ 
@@ -96,38 +95,40 @@ function MultiSelectField({
 export default function SiteFormModal({ isOpen, onClose, initialData, profile, initialTab }: SiteFormModalProps) {
   const [formData, setFormData] = useState<Partial<Site>>(DEFAULT_SITE);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'technical' | 'power' | 'transmission' | 'infrastructure' | 'contact'>('general');
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       if (initialTab) setActiveTab(initialTab);
-      if (initialData) {
-        // Normalize for legacy data
-        const normalized = { ...initialData } as any;
-        if (Array.isArray(initialData.technologies)) {
-           normalized.technologies = {
-             type: initialData.technologies,
-             lteType: [],
-             lteRRUConfig: []
-           };
-        }
-        if (!normalized.transmission) normalized.transmission = { ...DEFAULT_SITE.transmission };
-        if (!normalized.power) normalized.power = { ...DEFAULT_SITE.power };
-        if (!normalized.tower) normalized.tower = { ...DEFAULT_SITE.tower };
-        if (!normalized.admin) normalized.admin = { ...DEFAULT_SITE.admin };
-        if (!normalized.engineer) normalized.engineer = { ...DEFAULT_SITE.engineer };
-        if (!normalized.owner) normalized.owner = { ...DEFAULT_SITE.owner };
-        if (!normalized.leaseContract) normalized.leaseContract = { ...DEFAULT_SITE.leaseContract };
-        if (!normalized.environment) normalized.environment = { ...DEFAULT_SITE.environment };
-        
-        setFormData(normalized);
-      } else {
-        setFormData(DEFAULT_SITE);
+      
+      // Only set form data if it's the first time opening or switching modes
+      // This prevents overwriting user progress if the parent re-renders
+      const initial = initialData || DEFAULT_SITE;
+      
+      // Normalize for legacy data
+      const normalized = { ...initial } as any;
+      if (initialData && Array.isArray(initialData.technologies)) {
+         normalized.technologies = {
+           type: initialData.technologies,
+           lteType: [],
+           lte1800RRU: []
+         };
       }
+      if (!normalized.transmission) normalized.transmission = { ...DEFAULT_SITE.transmission };
+      if (!normalized.power) normalized.power = { ...DEFAULT_SITE.power };
+      if (!normalized.tower) normalized.tower = { ...DEFAULT_SITE.tower };
+      if (!normalized.admin) normalized.admin = { ...DEFAULT_SITE.admin };
+      if (!normalized.engineer) normalized.engineer = { ...DEFAULT_SITE.engineer };
+      if (!normalized.owner) normalized.owner = { ...DEFAULT_SITE.owner };
+      if (!normalized.leaseContract) normalized.leaseContract = { ...DEFAULT_SITE.leaseContract };
+      if (!normalized.environment) normalized.environment = { ...DEFAULT_SITE.environment };
+      
+      setFormData(normalized);
       setIsDirty(false);
     }
-  }, [initialData, isOpen]);
+  }, [isOpen]); // Only trigger on open/close
 
   const handleClose = () => {
     if (isDirty) {
@@ -142,17 +143,12 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    const isEditing = !!initialData?.id;
-    const confirmMessage = isEditing 
-      ? "CRITICAL DATABASE OPERATION: Are you absolutely certain you want to commit these modifications to the network asset registry? This action will be permanently recorded in the audit trail."
-      : "NEW ASSET REGISTRATION: Proceed with committing this node to the production environment?";
-
-    if (!window.confirm(confirmMessage)) return;
-
     setLoading(true);
+    setErrorMsg(null);
     try {
       const auditData = {
         ...formData,
+        lastAudit: new Date().toLocaleDateString(),
         lastAuditDate: new Date(),
         updatedAt: new Date(),
         updatedByUserId: profile?.uid || '',
@@ -160,8 +156,8 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
         updatedBy: profile?.name || '' // Legacy field
       };
 
-      if (isEditing) {
-        await updateSite(initialData!.id!, auditData);
+      if (initialData?.id) {
+        await updateSite(initialData.id, auditData);
       } else {
         await createSite(auditData);
       }
@@ -175,7 +171,7 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
         const complaintData: Partial<Complaint> = {
           ticketNumber,
           type: 'Site',
-          complaintName: `Low Battery Health Alarm: ${formData.power?.batteryHealth}%`,
+          complaintName: `Low Battery Health Alarm: ${formData.power.batteryHealth}%`,
           complainerName: 'System Monitor',
           complainerContact: 'Auto-Generated',
           province: formData.admin?.province || '',
@@ -186,7 +182,7 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
           lng: formData.lng || 0,
           siteId: formData.siteId || '',
           status: 'Open',
-          comments: `Critical internal threshold reached. Battery health reported at ${formData.power?.batteryHealth}%. Immediate technical inspection required at site ${formData.siteId}.`,
+          comments: `Critical internal threshold reached. Battery health reported at ${formData.power.batteryHealth}%. Immediate technical inspection required at site ${formData.siteId}.`,
           createdByUserId: 'system',
           createdByUserName: 'Auto Monitor Service'
         };
@@ -197,6 +193,7 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
       onClose();
     } catch (error) {
       console.error(error);
+      setErrorMsg("Transaction Failed: Unable to commit changes to the database. Please verify network status.");
     } finally {
       setLoading(false);
     }
@@ -399,10 +396,10 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
                         onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lteType: val } })}
                       />
                       <MultiSelectField 
-                        label="LTE RRU Configuration"
-                        options={['2T2R', '4T4R', 'Massive MIMO']}
-                        selected={formData.technologies?.lteRRUConfig || []}
-                        onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lteRRUConfig: val } })}
+                        label="LTE 1800 RRU Type"
+                        options={['2T2R', '4T4R']}
+                        selected={formData.technologies?.lte1800RRU || []}
+                        onChange={(val) => updateFormData({ technologies: { ...formData.technologies!, lte1800RRU: val } })}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -539,13 +536,24 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 border-t border-ntc-blue/5 pt-4">
+                    <div className="grid grid-cols-2 gap-4 border-t border-ntc-blue/5 pt-4">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Battery Type</label>
                         <input 
                           className="w-full rounded-xl border border-ntc-blue/10 p-3 text-sm outline-none"
                           value={formData.power?.batteryType}
                           onChange={(e) => updateFormData({ power: { ...formData.power!, batteryType: e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Current Health (%)</label>
+                        <input 
+                          type="number"
+                          min="0"
+                          max="100"
+                          className="w-full rounded-xl border border-ntc-blue/10 p-3 text-sm outline-none font-mono text-indigo-600 font-bold"
+                          value={formData.power?.batteryHealth}
+                          onChange={(e) => updateFormData({ power: { ...formData.power!, batteryHealth: parseInt(e.target.value) || 0 } })}
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -821,15 +829,6 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
                           onChange={(e) => updateFormData({ engineer: { ...formData.engineer!, shift: e.target.value } })}
                         />
                       </div>
-                      <div className="col-span-2 space-y-1.5 border-t border-ntc-blue/5 pt-4">
-                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">System Auditor / Inspector</label>
-                        <input 
-                          placeholder="Name of the person who conducted the last audit"
-                          className="w-full rounded-xl border border-ntc-blue/10 p-3 text-sm outline-none"
-                          value={formData.auditBy}
-                          onChange={(e) => updateFormData({ auditBy: e.target.value })}
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
@@ -838,7 +837,14 @@ export default function SiteFormModal({ isOpen, onClose, initialData, profile, i
 
             {/* Footer Actions */}
             <div className="flex items-center justify-between border-t border-ntc-blue/5 bg-ntc-blue/[0.01] p-6">
-              <p className="text-[10px] uppercase tracking-widest opacity-40">Changes require system audit trail logging</p>
+              {errorMsg ? (
+                 <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1.5 rounded-lg">
+                    <Activity size={14} className="animate-pulse" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest">{errorMsg}</p>
+                 </div>
+              ) : (
+                <p className="text-[10px] uppercase tracking-widest opacity-40">Changes require system audit trail logging</p>
+              )}
               <div className="flex items-center gap-3">
                 <button 
                   type="button" 

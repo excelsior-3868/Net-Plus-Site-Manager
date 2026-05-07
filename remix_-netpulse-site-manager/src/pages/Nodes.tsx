@@ -18,11 +18,7 @@ import {
   AlertCircle,
   Cpu,
   Database,
-  FileText,
-  Activity,
-  Server,
-  Sun,
-  Map as MapIcon
+  Activity
 } from 'lucide-react';
 import { Site, UserProfile, Complaint } from '../types';
 import { getSites, deleteSite, createSite } from '../services/siteService';
@@ -32,7 +28,6 @@ import * as XLSX from 'xlsx';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import SiteFormModal from '../components/SiteFormModal';
 import ComplaintFormModal from '../components/ComplaintFormModal';
-import BulkImportPreviewModal from '../components/BulkImportPreviewModal';
 
 interface SitesProps {
   profile: UserProfile | null;
@@ -48,9 +43,6 @@ export default function Sites({ profile }: SitesProps) {
   const [editingSite, setEditingSite] = useState<Site | undefined>(undefined);
   const [editingComplaint, setEditingComplaint] = useState<Complaint | undefined>(undefined);
   const [importing, setImporting] = useState(false);
-  const [isPreviewModalOpen, setPreviewModalOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, duplicates: 0, invalid: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const provinceParam = searchParams.get('province');
@@ -77,7 +69,9 @@ export default function Sites({ profile }: SitesProps) {
       let matchesFilter = true;
       const tech = s.technologies;
       const techLength = Array.isArray(tech) ? tech.length : (tech?.type?.length || 0);
-      const isProposed = s.status === 'Planned' || s.status === 'Surveyed';
+      const isStatusProposed = s.status === 'Planned' || s.status === 'Surveyed';
+      const hasEquipment = techLength > 0;
+      const isProposed = isStatusProposed || (!hasEquipment && s.status !== 'Active' && s.status !== 'Maintenance');
 
       if (isSolarView || activeFilter === 'solar') {
         const sources = Array.isArray(s.power?.source) ? s.power.source : [String(s.power?.source || '')];
@@ -143,327 +137,345 @@ export default function Sites({ profile }: SitesProps) {
 
     filteredSites.forEach(s => {
       countEquipment(s.transmission?.indoorTransEquipmentVendor, s.transmission?.indoorTransEquipmentname, s.transmission?.bandwidthCapacity);
-      countEquipment(s.transmission?.indoorTransEquipmentVendor2, s.transmission?.indoorTransEquipmentname2, s.transmission?.bandwidthCapacity);
+      countEquipment((s.transmission as any)?.indoorTransEquipmentVendor2, (s.transmission as any)?.indoorTransEquipmentname2, s.transmission?.bandwidthCapacity);
     });
     return Object.values(details);
   }, [filteredSites, isTransmissionView]);
 
   useEffect(() => {
-    getSites(setSites);
-    getComplaints(setComplaints);
+    const unsubscribeSites = getSites(setSites);
+    const unsubscribeComplaints = getComplaints(setComplaints);
+    return () => {
+      unsubscribeSites();
+      unsubscribeComplaints();
+    };
+  }, []);
+
+  useEffect(() => {
     if (provinceParam) {
       setFilterProvince(provinceParam);
     }
-  }, []);
+  }, [provinceParam]);
 
-  const handleGenerateReport = () => {
-    if (filteredSites.length === 0) {
-      alert("No data available to generate a report.");
+  const handleExport = () => {
+    const dataToExport = filteredSites.map(s => ({
+      'Node ID': s.siteId,
+      'Site Name': s.name,
+      'Status': s.status,
+      'Province': s.admin?.province || '',
+      'Zone': s.admin?.zone || '',
+      'District': s.admin?.district || '',
+      'Local Level': s.admin?.localLevel || '',
+      'Coordinates': `${s.lat}, ${s.lng}`,
+      'Technologies': (s.technologies?.type || []).join(', '),
+      'LTE Bands': (s.technologies?.lteType || []).join(', '),
+      'LTE RRU Config': (s.technologies?.lte1800RRU || []).join(', '),
+      'Tower Height': s.tower?.height || '',
+      'Tower Type': s.tower?.type || '',
+      'Tower Owner': s.tower?.owner || '',
+      'Tower Foundation': s.tower?.foundation || '',
+      'Power Source': Array.isArray(s.power?.source) ? s.power.source.join(', ') : s.power?.source || '',
+      'Power Source Type': s.power?.sourceType || '',
+      'Backup DG': s.power?.backupDG || '',
+      'DG Capacity': s.power?.backupDGCapacity || '',
+      'Battery Type': s.power?.batteryType || '',
+      'Battery Capacity': s.power?.batteryCapacity || '',
+      'Battery Banks': s.power?.batteryBanks || '',
+      'Rectifier Vendor': s.power?.rectifierVendor || '',
+      'Rectifier Capacity': s.power?.rectifierCapacity || '',
+      'Solar Capacity': s.power?.solarCapacity || '',
+      'Battery Health (%)': s.power?.batteryHealth || '',
+      'Fuel Level (%)': s.power?.fuelLevel || '',
+      'Current Load': s.power?.currentLoad || '',
+      'NT Transformer': s.power?.ntTransformer ? 'Yes' : 'No',
+      'Power Cable Type': s.power?.powerCableType || '',
+      'Power Cable Length': s.power?.powerCableLength || '',
+      'Customer ID': s.power?.customerId || '',
+      'MCB Capacity': s.power?.mcbCapacity || '',
+      'Trans Type': s.transmission?.type || '',
+      'Bandwidth': s.transmission?.bandwidthCapacity || '',
+      'Trans Vendor': s.transmission?.vendor || '',
+      'Trans Path': s.transmission?.path || '',
+      'Trans Interface': s.transmission?.interface || '',
+      'Indoor Trans Type': s.transmission?.indoorTransEquipmentType || '',
+      'Indoor Trans Name': s.transmission?.indoorTransEquipmentname || '',
+      'Indoor Trans Vendor': s.transmission?.indoorTransEquipmentVendor || '',
+      'Indoor Trans Type 2': (s.transmission as any)?.indoorTransEquipmentType2 || '',
+      'Indoor Trans Name 2': (s.transmission as any)?.indoorTransEquipmentname2 || '',
+      'Indoor Trans Vendor 2': (s.transmission as any)?.indoorTransEquipmentVendor2 || '',
+      'Hub Site': s.hubSite || '',
+      'Parent Site': s.parentSite || '',
+      'Shelter Type': s.shelterType || '',
+      'Owner Name': s.owner?.name || '',
+      'Owner Contact': s.owner?.contact || '',
+      'Owner Type': s.owner?.type || '',
+      'Access Code': s.owner?.accessCode || '',
+      'Lease Date': s.leaseContract?.Date || '',
+      'Renewal Years': s.leaseContract?.renewalOnYears || '',
+      'Renewal Percent': s.leaseContract?.renewalPercent || '',
+      'Engineer Name': s.engineer?.name || '',
+      'Engineer Phone': s.engineer?.phone || '',
+      'Employee ID': s.engineer?.employeeId || '',
+      'Engineer Shift': s.engineer?.shift || '',
+      'Temp (C)': s.environment?.temp || '',
+      'Humidity (%)': s.environment?.humidity || '',
+      'Smoke Detector': s.environment?.smokeDetector ? 'Yes' : 'No',
+      'Door Open': s.environment?.doorOpen ? 'Yes' : 'No',
+      'Active Alarms': (s.alarms || []).join(', '),
+      'Last Audit': s.lastAudit || '',
+      'Audit By': s.updatedByUserName || '',
+      'Ward/Tole Area': s.admin?.wardToleArea || '',
+      'Fencing Done by NT': s.tower?.fencingDoneByNT ? 'Yes' : 'No'
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "NTC_Nodes");
+    XLSX.writeFile(wb, `ntc_nodes_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleBulkImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    // Starting import process
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    console.log(`Starting bulk import for file: ${file.name}`);
+
+    if (!window.confirm(`Bulk Import Initiation: Are you sure you want to attempt importing records from "${file.name}"?`)) {
+      e.target.value = '';
       return;
     }
 
-    const reportData = filteredSites.map(s => ({
-      'Site ID': s.siteId,
-      'Site Name': s.name,
-      'Operational Status': s.status,
-      'Region': s.admin?.province || '',
-      'Zone': s.admin?.zone || '',
-      'District': s.admin?.district || '',
-      'Municipality/Local Level': s.admin?.localLevel || '',
-      'Ward/Tole Area': s.admin?.wardToleArea || '',
-      'Latitude': s.lat,
-      'Longitude': s.lng,
-      'Technologies': (s.technologies?.type || []).join(', '),
-      'Tower Type': s.tower?.type || '',
-      'Tower Height': s.tower?.height || '',
-      'NT Fencing': s.tower?.fencingDoneByNT ? 'Yes' : 'No',
-      'Power Source': Array.isArray(s.power?.source) ? s.power.source.join(', ') : s.power?.source || '',
-      'Battery Health (%)': s.power?.batteryHealth || '',
-      'NT Transformer': s.power?.ntTransformer ? 'Yes' : 'No',
-      'Customer ID': s.power?.customerId || '',
-      'MCB Capacity': s.power?.mcbCapacity || '',
-      'Transmission Type': s.transmission?.type || '',
-      'Bandwidth Capacity': s.transmission?.bandwidthCapacity || '',
-      'Primary Gear': `${s.transmission?.indoorTransEquipmentVendor || ''} ${s.transmission?.indoorTransEquipmentname || ''}`,
-      'Responsible Engineer': s.engineer?.name || '',
-      'Engineer Contact': s.engineer?.phone || '',
-      'Last Audit Date': s.lastAudit || ''
-    }));
+    if (!profile) {
+      alert("System Error: Your administrative profile is not yet loaded. Please wait a moment and try again.");
+      e.target.value = '';
+      return;
+    }
 
-    const ws = XLSX.utils.json_to_sheet(reportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Infrastructure_Report");
-    XLSX.writeFile(wb, `ntc_network_report_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-
-  const handleExport = () => {
-    // Generate a flat template matching the NTC import schema (limit to 4 rows for template)
-    const exportData = (filteredSites.length > 0 ? filteredSites.slice(0, 4) : [{}]).map(s => {
-      const site = s as Site;
-      return {
-        'Node ID': site.siteId || '',
-        'Site Name': site.name || '',
-        'Status': site.status || 'Active',
-        'Coordinates': (site.lat && site.lng) ? `${site.lat}, ${site.lng}` : '',
-        'Province': site.admin?.province || '',
-        'Zone': site.admin?.zone || '',
-        'District': site.admin?.district || '',
-        'Local Level': site.admin?.localLevel || '',
-        'Ward/Tole Area': site.admin?.wardToleArea || '',
-        'Technologies': Array.isArray(site.technologies?.type) ? site.technologies.type.join(', ') : '',
-        'LTE Bands': Array.isArray(site.technologies?.lteType) ? site.technologies.lteType.join(', ') : '',
-        'LTE RRU Config': Array.isArray(site.technologies?.lteRRUConfig) ? site.technologies.lteRRUConfig.join(', ') : '',
-        'Tower Height (m)': site.tower?.height || '',
-        'Tower Type': site.tower?.type || '',
-        'Tower Owner': site.tower?.owner || '',
-        'Tower Foundation': site.tower?.foundation || '',
-        'NT Fencing': site.tower?.fencingDoneByNT ? 'Yes' : 'No',
-        'Power Source': Array.isArray(site.power?.source) ? site.power.source.join(', ') : '',
-        'Power Source Type': site.power?.sourceType || '',
-        'Backup DG': site.power?.backupDG || 'No',
-        'DG Capacity (kVA)': site.power?.backupDGCapacity || '',
-        'Battery Type': site.power?.batteryType || '',
-        'Battery Capacity (Ah)': site.power?.batteryCapacity || '',
-        'Battery Banks': site.power?.batteryBanks || '',
-        'Rectifier Vendor': site.power?.rectifierVendor || '',
-        'Rectifier Capacity (A)': site.power?.rectifierCapacity || '',
-        'Solar Capacity (kWp)': site.power?.solarCapacity || '',
-        'Battery Health (%)': site.power?.batteryHealth || 0,
-        'Fuel Level (%)': site.power?.fuelLevel || 0,
-        'Current Load (A)': site.power?.currentLoad || '',
-        'NT Transformer': site.power?.ntTransformer ? 'Yes' : 'No',
-        'Power Cable Type': site.power?.powerCableType || '',
-        'Power Cable Length (m)': site.power?.powerCableLength || '',
-        'Customer ID': site.power?.customerId || '',
-        'MCB Capacity': site.power?.mcbCapacity || '',
-        'Trans Type': site.transmission?.type || 'Fiber',
-        'Bandwidth': site.transmission?.bandwidthCapacity || '',
-        'Trans Vendor': site.transmission?.vendor || '',
-        'Trans Path': site.transmission?.path || '',
-        'Trans Interface': site.transmission?.interface || '',
-        'Indoor Trans Type': site.transmission?.indoorTransEquipmentType || '',
-        'Indoor Trans Name': site.transmission?.indoorTransEquipmentname || '',
-        'Indoor Trans Vendor': site.transmission?.indoorTransEquipmentVendor || '',
-        'Indoor Trans Type 2': site.transmission?.indoorTransEquipmentType2 || '',
-        'Indoor Trans Name 2': site.transmission?.indoorTransEquipmentname2 || '',
-        'Indoor Trans Vendor 2': site.transmission?.indoorTransEquipmentVendor2 || '',
-        'Hub Site': site.hubSite || 'No',
-        'Parent Site': site.parentSite || '',
-        'Shelter Type': site.shelterType || 'Outdoor',
-        'Owner Name': site.owner?.name || '',
-        'Owner Contact': site.owner?.contact || '',
-        'Owner Type': site.owner?.type || 'Internal',
-        'Access Code': site.owner?.accessCode || '',
-        'Lease Date': site.leaseContract?.Date || '',
-        'Renewal (Years)': site.leaseContract?.renewalOnYears || '',
-        'Renewal (%)': site.leaseContract?.renewalPercent || '',
-        'Engineer Name': site.engineer?.name || '',
-        'Engineer Phone': site.engineer?.phone || '',
-        'Employee ID': site.engineer?.employeeId || '',
-        'Shift': site.engineer?.shift || '',
-        'Temp (C)': site.environment?.temp || 0,
-        'Humidity (%)': site.environment?.humidity || 0,
-        'Smoke Detector': site.environment?.smokeDetector ? 'Yes' : 'No',
-        'Door Open Alarm': site.environment?.doorOpen ? 'Yes' : 'No',
-        'Alarms': Array.isArray(site.alarms) ? site.alarms.join(', ') : '',
-        'Last Audit': site.lastAudit || '',
-        'Audit By': site.auditBy || ''
-      };
-    });
+    setImporting(true);
+    const reader = new FileReader();
     
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "NTC_Nodes");
-    XLSX.writeFile(wb, `ntc_inventory_template.xlsx`);
-  };
-
-    const handleBulkImport = (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      setImporting(true);
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+    reader.onload = async (evt) => {
+      try {
+        const dataBuffer = evt.target?.result;
+        if (!dataBuffer) throw new Error("The system encountered an error reading the local file buffer.");
+        
+        const wb = XLSX.read(dataBuffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()));
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          alert("Import Canceled: The selected Excel file contains no valid data rows or is incorrectly formatted.");
+          setImporting(false);
+          return;
+        }
 
+        console.log(`Successfully parsed ${data.length} rows.`);
+        
         const getVal = (row: any, ...keys: string[]) => {
-          for (const key of keys) {
-            if (row[key] !== undefined) return row[key];
-          }
-          return '';
-        };
-
-        const previewData = data.filter((row: any) => {
-          return getVal(row, 'Node ID', 'BTS ID', 'Site ID');
-        }).map((dataRow: any) => {
-          const item: any = {
-            siteId: String(getVal(dataRow, 'Node ID', 'BTS ID', 'Site ID') || '').trim(),
-            name: String(getVal(dataRow, 'Site Name', 'Name') || '').trim(),
-            status: 'Active',
-            admin: {
-              province: getVal(dataRow, 'Province') || '',
-              zone: getVal(dataRow, 'Zone') || '',
-              district: getVal(dataRow, 'District') || '',
-              localLevel: getVal(dataRow, 'Local Level') || '',
-              wardToleArea: getVal(dataRow, 'Ward/Tole Area') || '',
-            },
-            technologies: {
-              type: String(getVal(dataRow, 'Technologies', 'Technology') || '').split(',').map(s => s.trim()).filter(Boolean),
-              lteType: String(getVal(dataRow, 'LTE Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
-              lteRRUConfig: String(getVal(dataRow, 'LTE RRU Config') || '').split(',').map(s => s.trim()).filter(Boolean),
-            },
-            tower: {
-              height: getVal(dataRow, 'Tower Height (m)') || '',
-              type: getVal(dataRow, 'Tower Type') || '',
-              owner: getVal(dataRow, 'Tower Owner') || '',
-              foundation: getVal(dataRow, 'Tower Foundation') || '',
-              fencingDoneByNT: String(getVal(dataRow, 'NT Fencing') || '').toLowerCase() === 'yes',
-            },
-            power: {
-              source: String(getVal(dataRow, 'Power Source') || '').split(',').map(s => s.trim()).filter(Boolean),
-              sourceType: getVal(dataRow, 'Power Source Type') || '',
-              backupDG: getVal(dataRow, 'Backup DG') || 'No',
-              backupDGCapacity: getVal(dataRow, 'DG Capacity (kVA)') || '',
-              batteryType: getVal(dataRow, 'Battery Type') || '',
-              batteryCapacity: getVal(dataRow, 'Battery Capacity (Ah)') || '',
-              batteryBanks: getVal(dataRow, 'Battery Banks') || '',
-              rectifierVendor: getVal(dataRow, 'Rectifier Vendor') || '',
-              rectifierCapacity: getVal(dataRow, 'Rectifier Capacity (A)') || '',
-              solarCapacity: getVal(dataRow, 'Solar Capacity (kWp)') || '',
-              batteryHealth: parseInt(String(getVal(dataRow, 'Battery Health (%)') || '0')) || 0,
-              fuelLevel: parseInt(String(getVal(dataRow, 'Fuel Level (%)') || '0')) || 0,
-              currentLoad: getVal(dataRow, 'Current Load (A)') || '',
-              ntTransformer: String(getVal(dataRow, 'NT Transformer') || '').toLowerCase() === 'yes',
-              powerCableType: getVal(dataRow, 'Power Cable Type') || '',
-              powerCableLength: parseFloat(String(getVal(dataRow, 'Power Cable Length (m)') || '0')) || 0,
-              customerId: getVal(dataRow, 'Customer ID') || '',
-              mcbCapacity: getVal(dataRow, 'MCB Capacity') || '',
-            },
-            transmission: {
-              type: getVal(dataRow, 'Trans Type') || 'Fiber',
-              bandwidthCapacity: getVal(dataRow, 'Bandwidth') || '',
-              vendor: getVal(dataRow, 'Trans Vendor') || '',
-              path: getVal(dataRow, 'Trans Path') || '',
-              interface: getVal(dataRow, 'Trans Interface') || '',
-              indoorTransEquipmentType: getVal(dataRow, 'Indoor Trans Type') || '',
-              indoorTransEquipmentname: getVal(dataRow, 'Indoor Trans Name') || '',
-              indoorTransEquipmentVendor: getVal(dataRow, 'Indoor Trans Vendor') || '',
-              indoorTransEquipmentType2: getVal(dataRow, 'Indoor Trans Type 2') || '',
-              indoorTransEquipmentname2: getVal(dataRow, 'Indoor Trans Name 2') || '',
-              indoorTransEquipmentVendor2: getVal(dataRow, 'Indoor Trans Vendor 2') || '',
-            },
-            hubSite: getVal(dataRow, 'Hub Site') || 'No',
-            parentSite: getVal(dataRow, 'Parent Site') || '',
-            shelterType: getVal(dataRow, 'Shelter Type') || 'Outdoor',
-            owner: {
-              name: getVal(dataRow, 'Owner Name') || '',
-              contact: getVal(dataRow, 'Owner Contact') || '',
-              type: getVal(dataRow, 'Owner Type') || 'Internal',
-              accessCode: getVal(dataRow, 'Access Code') || '',
-            },
-            leaseContract: {
-              Date: getVal(dataRow, 'Lease Date') || '',
-              renewalOnYears: getVal(dataRow, 'Renewal (Years)') || '',
-              renewalPercent: getVal(dataRow, 'Renewal (%)') || '',
-            },
-            engineer: {
-              name: getVal(dataRow, 'Engineer Name') || '',
-              phone: getVal(dataRow, 'Engineer Phone') || '',
-              employeeId: getVal(dataRow, 'Employee ID') || '',
-              shift: getVal(dataRow, 'Shift') || '',
-            },
-            environment: {
-              temp: parseFloat(String(getVal(dataRow, 'Temp (C)') || '0')) || 0,
-              humidity: parseFloat(String(getVal(dataRow, 'Humidity (%)') || '0')) || 0,
-              smokeDetector: String(getVal(dataRow, 'Smoke Detector') || '').toLowerCase() === 'yes',
-              doorOpen: String(getVal(dataRow, 'Door Open Alarm') || '').toLowerCase() === 'yes',
-            },
-            alarms: String(getVal(dataRow, 'Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
-            lastAudit: getVal(dataRow, 'Last Audit') || '',
-            auditBy: getVal(dataRow, 'Audit By') || '',
-          };
-
-          const coords = getVal(dataRow, 'Coordinates');
-          if (typeof coords === 'string' && coords.includes(',')) {
-            const parts = coords.split(',').map(p => parseFloat(p.trim()));
-            if (parts.length >= 2) {
-              item.lat = parts[0];
-              item.lng = parts[1];
+          const rowKeys = Object.keys(row);
+          for (const k of keys) {
+            const searchKey = k.toLowerCase().trim();
+            if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+              return typeof row[k] === 'string' ? row[k].trim() : row[k];
+            }
+            const foundKey = rowKeys.find(rk => rk.toLowerCase().trim() === searchKey);
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+              return typeof row[foundKey] === 'string' ? row[foundKey].trim() : row[foundKey];
             }
           }
+          return undefined;
+        };
 
-          item._isDuplicate = item.siteId && existingNodeIds.has(item.siteId.toLowerCase());
-          item._isInvalid = !item.siteId;
-          return item;
+        const existingNodeIds = new Set(sites.map(s => String(s.siteId || '').toLowerCase().trim()).filter(Boolean));
+        const failedRowsArr: { row: number; id: string; error: string }[] = [];
+        let duplicateCount = 0;
+        let invalidCount = 0;
+
+        const toImport = data.filter((row, idx) => {
+          const idCandidates = ['Node ID', 'siteId', 'NodeID', 'Site ID', 'ID', 'SiteID', 'SiteRef', 'Asset ID', 'Site_ID'];
+          const rowSiteIdRaw = getVal(row, ...idCandidates);
+          
+          if (!rowSiteIdRaw) {
+            invalidCount++;
+            return false;
+          }
+
+          const rowSiteId = String(rowSiteIdRaw).toLowerCase().trim();
+          if (existingNodeIds.has(rowSiteId)) {
+            duplicateCount++;
+            return false;
+          }
+          return true;
         });
 
-        setPreviewData(previewData);
-        setImportSummary({
-          total: data.length,
-          valid: previewData.filter(i => !i._isDuplicate && !i._isInvalid).length,
-          duplicates: previewData.filter(i => i._isDuplicate).length,
-          invalid: previewData.filter(i => i._isInvalid).length
-        });
-        setPreviewModalOpen(true);
-        setImporting(false);
-      };
-      reader.readAsBinaryString(file);
-      e.target.value = ''; // Reset input
-    };
-
-    const commitBulkImport = async () => {
-      if (!profile) return;
-      setImporting(true);
-      const toImport = previewData.filter(item => !item._isInvalid && !item._isDuplicate);
-      let successCount = 0;
-      const failedRows: string[] = [];
-
-      for (const row of toImport) {
-        try {
-          const newSite: Partial<Site> = {
-            siteId: row.siteId,
-            name: row.name,
-            status: row.status,
-            lat: row.lat,
-            lng: row.lng,
-            admin: row.admin,
-            technologies: row.technologies,
-            tower: row.tower,
-            power: row.power,
-            transmission: row.transmission,
-            hubSite: row.hubSite,
-            parentSite: row.parentSite,
-            shelterType: row.shelterType,
-            owner: row.owner,
-            leaseContract: row.leaseContract,
-            engineer: row.engineer,
-            environment: row.environment,
-            alarms: row.alarms,
-            lastAudit: row.lastAudit,
-            auditBy: row.auditBy,
-            updatedBy: profile.name,
-            updatedByUserId: profile.uid,
-            updatedByUserName: profile.name,
-          };
-
-          await createSite(newSite);
-          successCount++;
-        } catch (err: any) {
-          failedRows.push(`${row.siteId}: ${err.message}`);
+        if (toImport.length === 0) {
+          alert(`Import Result: No new data to process.\n\n- Total Rows in File: ${data.length}\n- Duplicates Skipped: ${duplicateCount}\n- Missing Node ID: ${invalidCount}\n\nPlease ensure your Node IDs are unique and the column header matches "Node ID".`);
+          setImporting(false);
+          return;
         }
-      }
 
-      setPreviewModalOpen(false);
-      setImporting(false);
-      alert(`Import completed: ${successCount} sites added.\n${failedRows.length > 0 ? `Failed: ${failedRows.join(', ')}` : ''}`);
-      getSites(setSites);
+        console.log(`Executing batch import of ${toImport.length} new records...`);
+
+        const results = await Promise.all(toImport.map(async (row) => {
+          const originalIndex = data.indexOf(row);
+          const rowNumber = originalIndex + 2;
+          const siteId = String(getVal(row, 'Node ID', 'siteId', 'NodeID', 'SiteID', 'ID') || 'Unknown');
+
+          try {
+            let lat = 0, lng = 0;
+            const coords = getVal(row, 'Coordinates', 'Coords', 'Location', 'Lat/Long', 'Lat,Long');
+            if (typeof coords === 'string' && coords.includes(',')) {
+              const parts = coords.split(',').map(p => parseFloat(p.trim()));
+              if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                lat = parts[0];
+                lng = parts[1];
+              }
+            } else {
+              lat = parseFloat(String(getVal(row, 'Latitude', 'lat', 'Lat') || '0')) || 0;
+              lng = parseFloat(String(getVal(row, 'Longitude', 'lng', 'Long', 'Lng') || '0')) || 0;
+            }
+
+            const nodeStatus = (getVal(row, 'Status', 'status', 'Site Status') || 'Active') as any;
+
+            const newSite: Partial<Site> = {
+              siteId: siteId,
+              name: String(getVal(row, 'Site Name', 'Name', 'SiteName', 'Site_Name') || 'Unnamed Site'),
+              status: nodeStatus,
+              lat,
+              lng,
+              admin: {
+                province: String(getVal(row, 'Province', 'state', 'Region') || ''),
+                zone: String(getVal(row, 'Zone', 'SubRegion') || ''),
+                district: String(getVal(row, 'District', 'City') || ''),
+                localLevel: String(getVal(row, 'Local Level', 'LocalLevel', 'Municipality', 'Area') || ''),
+                wardToleArea: String(getVal(row, 'Ward/Tole Area', 'WardToleArea', 'Ward', 'Tole') || ''),
+              },
+              technologies: {
+                type: String(getVal(row, 'Technologies', 'Technology', 'Network') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lteType: String(getVal(row, 'LTE Bands', 'LTEBands', 'Bands') || '').split(',').map(s => s.trim()).filter(Boolean),
+                lte1800RRU: String(getVal(row, 'LTE RRU Config', 'RRUConfig') || '').split(',').map(s => s.trim()).filter(Boolean),
+              },
+              tower: { 
+                height: String(getVal(row, 'Tower Height', 'Height') || ''), 
+                type: String(getVal(row, 'Tower Type', 'TowerType') || ''), 
+                owner: String(getVal(row, 'Tower Owner', 'TowerOwner') || ''), 
+                foundation: String(getVal(row, 'Tower Foundation', 'Foundation') || ''),
+                fencingDoneByNT: String(getVal(row, 'Fencing Done by NT', 'FencingNT', 'Fencing') || '').toLowerCase().includes('yes'), 
+              },
+              power: { 
+                source: String(getVal(row, 'Power Source', 'Source') || '').split(',').map(s => s.trim()).filter(Boolean),
+                sourceType: String(getVal(row, 'Power Source Type', 'SourceType') || ''),
+                backupDG: (String(getVal(row, 'Backup DG', 'DG') || 'No').trim().toLowerCase().startsWith('y') ? 'Yes' : 'No') as 'Yes' | 'No', 
+                backupDGCapacity: String(getVal(row, 'DG Capacity', 'DGCapacity') || ''), 
+                batteryType: String(getVal(row, 'Battery Type', 'BatteryType') || ''), 
+                batteryCapacity: String(getVal(row, 'Battery Capacity') || ''), 
+                batteryBanks: String(getVal(row, 'Battery Banks', 'BatteryBanks') || ''), 
+                rectifierVendor: String(getVal(row, 'Rectifier Vendor', 'Rectifier') || ''), 
+                rectifierCapacity: String(getVal(row, 'Rectifier Capacity') || ''), 
+                solarCapacity: String(getVal(row, 'Solar Capacity', 'Solar') || ''), 
+                batteryHealth: Math.min(100, Math.max(0, parseInt(String(getVal(row, 'Battery Health (%)') || '100')))), 
+                fuelLevel: Math.min(100, Math.max(0, parseInt(String(getVal(row, 'Fuel Level (%)') || '100')))), 
+                currentLoad: String(getVal(row, 'Current Load', 'Load') || ''),
+                ntTransformer: String(getVal(row, 'NT Transformer', 'NTTransformer') || '').toLowerCase().includes('yes'),
+                powerCableType: String(getVal(row, 'Power Cable Type', 'PowerCableType') || ''),
+                powerCableLength: parseFloat(String(getVal(row, 'Power Cable Length', 'PowerCableLength') || '0')) || 0,
+                customerId: String(getVal(row, 'Customer ID', 'CustomerID', 'NEA ID') || ''),
+                mcbCapacity: String(getVal(row, 'MCB Capacity', 'MCBCapacity') || ''),
+              },
+              transmission: { 
+                type: String(getVal(row, 'Trans Type', 'Transmission Media', 'Media') || ''), 
+                bandwidthCapacity: String(getVal(row, 'Bandwidth', 'Capacity') || ''), 
+                vendor: String(getVal(row, 'Trans Vendor', 'Vendor') || ''), 
+                path: String(getVal(row, 'Trans Path', 'Path') || ''), 
+                interface: String(getVal(row, 'Trans Interface', 'Interface') || ''), 
+                indoorTransEquipmentType: String(getVal(row, 'Indoor Trans Type') || ''), 
+                indoorTransEquipmentname: String(getVal(row, 'Indoor Trans Name') || ''), 
+                indoorTransEquipmentVendor: String(getVal(row, 'Indoor Trans Vendor') || ''),
+                indoorTransEquipmentType2: String(getVal(row, 'Indoor Trans Type 2') || ''), 
+                indoorTransEquipmentname2: String(getVal(row, 'Indoor Trans Name 2') || ''), 
+                indoorTransEquipmentVendor2: String(getVal(row, 'Indoor Trans Vendor 2') || '') 
+              },
+              hubSite: (String(getVal(row, 'Hub Site') || 'No').trim().toLowerCase().startsWith('y') ? 'Yes' : 'No') as any,
+              parentSite: String(getVal(row, 'Parent Site') || ''),
+              shelterType: String(getVal(row, 'Shelter Type') || ''),
+              owner: { 
+                name: String(getVal(row, 'Owner Name') || ''), 
+                contact: String(getVal(row, 'Owner Contact') || ''), 
+                type: (getVal(row, 'Owner Type') || 'Internal') as any, 
+                accessCode: String(getVal(row, 'Access Code') || '') 
+              },
+              engineer: { 
+                name: String(getVal(row, 'Engineer Name') || ''), 
+                phone: String(getVal(row, 'Engineer Phone') || ''), 
+                employeeId: String(getVal(row, 'Employee ID') || ''), 
+                shift: (getVal(row, 'Engineer Shift') || 'Alpha') as any 
+              },
+              leaseContract: { 
+                Date: String(getVal(row, 'Lease Date') || ''), 
+                renewalOnYears: String(getVal(row, 'Renewal Years') || ''), 
+                renewalPercent: String(getVal(row, 'Renewal Percent') || '') 
+              },
+              environment: { 
+                temp: parseInt(String(getVal(row, 'Temp (C)') || '25')), 
+                humidity: parseInt(String(getVal(row, 'Humidity (%)') || '50')), 
+                smokeDetector: String(getVal(row, 'Smoke Detector') || '').toLowerCase().includes('yes'), 
+                doorOpen: String(getVal(row, 'Door Open') || '').toLowerCase().includes('yes') 
+              },
+              alarms: String(getVal(row, 'Active Alarms') || '').split(',').map(s => s.trim()).filter(Boolean),
+              updatedByUserId: profile.uid,
+              updatedByUserName: profile.name,
+              updatedBy: profile.name,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            await createSite(newSite);
+            return true;
+          } catch (err: any) {
+            console.error(`Import error during database write at row ${rowNumber}:`, err);
+            let errorMessage = "Database Execution Error";
+            try {
+              const errObj = err.message ? JSON.parse(err.message) : err;
+              errorMessage = errObj.error || err.message || String(err);
+            } catch {
+              errorMessage = err.message || String(err);
+            }
+            failedRowsArr.push({ row: rowNumber, id: siteId, error: errorMessage });
+            return false;
+          }
+        }));
+
+        const successCount = results.filter(r => r === true).length;
+        let summaryText = `Bulk Import Summary:\n\n`;
+        summaryText += `✅ Success: ${successCount} sites record added\n`;
+        if (duplicateCount > 0) summaryText += `⏭️ Skipped: ${duplicateCount} existing duplicates\n`;
+        if (invalidCount > 0) summaryText += `⚠️ Invalid: ${invalidCount} rows missing header "Node ID"\n`;
+        
+        if (failedRowsArr.length > 0) {
+          summaryText += `\n❌ Failed: ${failedRowsArr.length} errors occurred during writing\n`;
+          failedRowsArr.slice(0, 10).forEach(f => {
+            summaryText += `   - Row ${f.row} [ID: ${f.id}]: ${f.error.substring(0, 80)}\n`;
+          });
+          if (failedRowsArr.length > 10) summaryText += `   ... and ${failedRowsArr.length - 10} more.`;
+        }
+
+        alert(summaryText);
+      } catch (error: any) {
+        console.error("Bulk import process fatal error:", error);
+        alert(`System Failure during Import: ${error.message || "An unexpected error occurred during Excel processing."}`);
+      } finally {
+        setImporting(false);
+        if (e.target) e.target.value = '';
+        console.log("Bulk import process finished.");
+      }
     };
+    reader.onerror = () => {
+      alert("File Access Failure: System could not read the selected local registry file.");
+      setImporting(false);
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   const handleSaveComplaint = async (updated: Complaint) => {
     try {
@@ -497,11 +509,25 @@ export default function Sites({ profile }: SitesProps) {
   };
 
   const handleConfirmDelete = async (id: string) => {
-    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this asset record? This cannot be undone.")) {
+    if (!id) {
+       alert("Target Identification Failure: Could not resolve the unique ID for this record.");
+       return;
+    }
+    
+    if (window.confirm("CRITICAL PROTOCOL: Are you sure you want to permanently DESTRUCT this asset record from the production registry? This action is irreversible.")) {
       try {
         await deleteSite(id);
-      } catch (error) {
-        console.error("Delete failed", error);
+        alert("Success: Asset record has been purged from the database.");
+      } catch (error: any) {
+        console.error("Deletion execution failed:", error);
+        let errorMessage = "Check administrative authorization and connection stability.";
+        try {
+          const errStatus = error.message ? JSON.parse(error.message) : (typeof error === 'string' ? JSON.parse(error) : error);
+          errorMessage = errStatus.error || errorMessage;
+        } catch {
+          errorMessage = error.message || String(error);
+        }
+        alert(`Deletion Access Denied: ${errorMessage}`);
       }
     }
   };
@@ -512,47 +538,31 @@ export default function Sites({ profile }: SitesProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg",
-            isSolarView ? "bg-amber-500 shadow-amber-500/20" : 
-            isPlannedView ? "bg-amber-500 shadow-amber-500/20" : 
-            isTransmissionView ? "bg-purple-500 shadow-purple-500/20" :
-            (activeFilter === 'complaints' || isComplaintsView) ? "bg-orange-500 shadow-orange-500/20" :
-            "bg-indigo-500 shadow-indigo-500/20"
-          )}>
-            {isSolarView ? <Sun size={24} /> : 
-             isPlannedView ? <MapIcon size={24} /> : 
-             isTransmissionView ? <Cpu size={24} /> :
-             (activeFilter === 'complaints' || isComplaintsView) ? <Bell size={24} /> :
-             <Server size={24} />}
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-ntc-blue">
-              {isSolarView ? 'Solar Stations Registry' : 
-               isPlannedView ? 'Planned & Surveyed Registry' : 
-               isTransmissionView ? 'Transmission Registry' :
-               (activeFilter === 'complaints' || isComplaintsView) ? 'Critical Sites Registry (Complaints)' :
-               techFilter ? `${techFilter} Technologies Registry` :
-               'Node Registry'}
-              <span className="ml-3 text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-xl align-middle border border-gray-200/50">
-                {filteredSites.length} Records
-              </span>
-            </h1>
-            <p className="mt-1 text-sm text-ntc-blue/60">
-              {isSolarView || activeFilter === 'solar' 
-               ? 'Filtering for Solar Powered Sites' 
-               : isTransmissionView
-                 ? `Nodes equipped with active ${typeFilter === 'All' ? 'transmission' : typeFilter.toLowerCase()} hardware.`
-                 : (activeFilter === 'complaints' || isComplaintsView)
-                   ? 'Nodes with active network performance complaints or alarms.'
-                   : techFilter
-                     ? `Filtering for nodes with active ${techFilter} logical capacity.`
-                     : isPlannedView 
-                       ? 'Infrastructure nodes in planning and survey phases.'
-                       : 'Comprehensive list of all BTS/eNodeB assets.'}
-            </p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-ntc-blue">
+            {isSolarView ? 'Solar Stations Registry' : 
+             isPlannedView ? 'Planned & Surveyed Registry' : 
+             isTransmissionView ? 'Transmission Registry' :
+             (activeFilter === 'complaints' || isComplaintsView) ? 'Critical Sites Registry (Complaints)' :
+             techFilter ? `${techFilter} Technologies Registry` :
+             'Node Registry'}
+            <span className="ml-3 text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-xl align-middle border border-gray-200/50">
+              {filteredSites.length} Records
+            </span>
+          </h2>
+          <p className="text-sm text-ntc-blue/60">
+            {isSolarView || activeFilter === 'solar' 
+             ? 'Filtering for Solar Powered Sites' 
+             : isTransmissionView
+               ? `Nodes equipped with active ${typeFilter === 'All' ? 'transmission' : typeFilter.toLowerCase()} hardware.`
+               : (activeFilter === 'complaints' || isComplaintsView)
+                 ? 'Nodes with active network performance complaints or alarms.'
+                 : techFilter
+                   ? `Filtering for nodes with active ${techFilter} logical capacity.`
+                   : isPlannedView 
+                     ? 'Infrastructure nodes in planning and survey phases.'
+                     : 'Comprehensive list of all BTS/eNodeB assets.'}
+          </p>
         </div>
 
         {hardwareSummary && hardwareSummary.length > 0 && (
@@ -599,27 +609,20 @@ export default function Sites({ profile }: SitesProps) {
             </button>
           )}
           <button 
-            onClick={handleGenerateReport}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
-          >
-            <FileText size={16} className="text-ntc-blue" />
-            <span>Generate Report</span>
-          </button>
-          <button 
             onClick={handleExport}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50"
           >
-            <Download size={16} className="text-emerald-600" />
-            <span>Download Template</span>
+            <Download size={16} />
+            <span>Generate Inventory</span>
           </button>
-          {canEdit && (
+            {canEdit && (
             <div className="flex items-center gap-3">
               <label className={cn(
                 "flex items-center gap-2 rounded-xl border border-ntc-blue/20 bg-ntc-blue/5 px-4 py-2.5 text-sm font-medium text-ntc-blue transition-all",
                 importing ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-ntc-blue/10"
               )}>
                 {importing ? (
-                  <Activity size={16} className="animate-spin text-ntc-blue" />
+                  <Activity size={16} className="animate-spin" />
                 ) : (
                   <Download size={16} className="rotate-180" />
                 )}
@@ -1096,14 +1099,6 @@ export default function Sites({ profile }: SitesProps) {
         onSave={handleSaveComplaint}
         complaint={editingComplaint}
         sites={sites}
-      />
-
-      <BulkImportPreviewModal
-        isOpen={isPreviewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        onConfirm={commitBulkImport}
-        data={previewData}
-        summary={importSummary}
       />
     </div>
   );

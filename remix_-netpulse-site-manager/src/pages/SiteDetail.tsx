@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { Site, UserProfile } from '../types';
-import { getSite, deleteSite } from '../services/siteService';
+import { getSite, deleteSite, subscribeToSite } from '../services/siteService';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -56,14 +56,22 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
   useEffect(() => {
     if (id) {
-      loadSite();
+      setLoading(true);
+      const unsubscribe = subscribeToSite(id, (data) => {
+        setSite(data);
+        setLoading(false);
+      });
+      return () => unsubscribe();
     }
   }, [id]);
 
   useEffect(() => {
+    // Subscribe to complaints for this site
+    // We prioritize site.siteId but fallback to doc id
     const targetId = site?.siteId || id;
     if (targetId) {
-       getSiteComplaints(targetId, setComplaints);
+       const unsubscribe = getSiteComplaints(targetId, setComplaints);
+       return () => unsubscribe();
     }
   }, [id, site?.siteId]);
 
@@ -197,28 +205,28 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                 {(Array.isArray(site.technologies) ? site.technologies.length > 0 : (site.technologies?.type?.length || 0) > 0) ? 'PHYSICAL ASSET' : 'PROPOSED INFRASTRUCTURE'}
               </span>
               <div className="flex items-center gap-4">
-                <span className="text-[10px] uppercase tracking-widest opacity-30">Node ID: {site.siteId}</span>
-                {(site.updatedByUserName || site.lastAuditDate) && (
-                  <div className="flex flex-col border-l border-ntc-blue/10 pl-4">
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-ntc-blue/40 font-bold">
-                      <Users size={10} /> Last audit by: {site.updatedByUserName || 'System'}
+              <span className="text-[10px] uppercase tracking-widest opacity-30">Node ID: {site.siteId}</span>
+              {(site.updatedByUserName || site.lastAuditDate) && (
+                <div className="flex flex-col border-l border-ntc-blue/10 pl-4">
+                  <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-ntc-blue/40 font-bold">
+                    <Users size={10} /> Last audit by: {site.updatedByUserName || 'System'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest text-ntc-blue/30 font-bold">
+                      <History size={10} /> 
+                      {site.lastAuditDate?.seconds 
+                        ? new Date(site.lastAuditDate.seconds * 1000).toLocaleString() 
+                        : site.lastAuditDate instanceof Date 
+                          ? site.lastAuditDate.toLocaleString()
+                          : site.lastAudit || 'Recently'}
                     </span>
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest text-ntc-blue/30 font-bold">
-                        <History size={10} /> 
-                        {site.lastAuditDate?.seconds 
-                          ? new Date(site.lastAuditDate.seconds * 1000).toLocaleString() 
-                          : site.lastAuditDate instanceof Date 
-                            ? site.lastAuditDate.toLocaleString()
-                            : site.lastAudit || 'Recently'}
-                      </span>
-                      {site.updatedByUserId && (
-                        <span className="text-[8px] text-gray-300 font-mono tracking-tighter">ID: {site.updatedByUserId}</span>
-                      )}
-                    </div>
+                    {site.updatedByUserId && (
+                      <span className="text-[8px] text-gray-300 font-mono tracking-tighter">ID: {site.updatedByUserId}</span>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
             </div>
             <h1 className="text-4xl font-semibold tracking-tight text-ntc-blue">{site.name}</h1>
             <div className="flex items-center gap-6 text-ntc-blue/40">
@@ -324,17 +332,17 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                      <div className="flex items-center gap-2">
                        <Zap size={14} /> Power Management
                      </div>
-                      {canEdit && (
-                        <button 
-                          onClick={() => {
-                            setInitialModalTab('power');
-                            setModalOpen(true);
-                          }}
-                          className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
-                        >
-                          <Edit2 size={10} /> Edit
-                        </button>
-                      )}
+                     {canEdit && (
+                       <button 
+                         onClick={() => {
+                           setInitialModalTab('power');
+                           setModalOpen(true);
+                         }}
+                         className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
+                       >
+                         <Edit2 size={10} /> Edit
+                       </button>
+                     )}
                    </h4>
                     <div className="space-y-4 rounded-3xl border border-[#141414]/5 p-6">
                       <div className="grid grid-cols-2 gap-y-4">
@@ -405,21 +413,8 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
               {/* Operations */}
               <div className="space-y-6">
                 <section>
-                   <h4 className="mb-4 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 group/header">
-                     <div className="flex items-center gap-2">
-                       <Database size={14} /> Network Connectivity
-                     </div>
-                     {canEdit && (
-                       <button 
-                         onClick={() => {
-                           setInitialModalTab('transmission');
-                           setModalOpen(true);
-                         }}
-                         className="opacity-0 group-hover/header:opacity-100 transition-all hover:text-ntc-blue flex items-center gap-1"
-                       >
-                         <Edit2 size={10} /> Edit
-                       </button>
-                     )}
+                   <h4 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40">
+                     <Database size={14} /> Network Connectivity
                    </h4>
                     <div className="space-y-4 rounded-3xl border border-[#141414]/5 p-6">
                       <div className="grid grid-cols-2 gap-y-4">
@@ -438,7 +433,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                          </div>
                          <div>
                             <p className="text-[10px] uppercase tracking-widest opacity-40">Indoor Equipment</p>
-                            <p className="font-mono text-xs">{site.transmission?.indoorTransEquipmentName || 'N/A'}</p>
+                            <p className="font-mono text-xs">{site.transmission?.indoorTransEquipmentname || 'N/A'}</p>
                             <p className="text-[9px] opacity-40">Type: {site.transmission?.indoorTransEquipmentType || 'N/A'}</p>
                          </div>
                          <div className="text-right">
@@ -609,7 +604,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
                       <div className="flex items-center gap-4 mt-2">
                         <div className="flex items-center gap-1 text-[10px] font-bold text-ntc-blue/30 uppercase tracking-tighter">
                           <Calendar size={10} />
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'}
+                          {c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                         </div>
                         {c.siteId && (
                            <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500/60 uppercase tracking-tighter">
@@ -632,7 +627,7 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
       <SiteFormModal 
         isOpen={isModalOpen} 
-        onClose={() => { setModalOpen(false); loadSite(); }} 
+        onClose={() => setModalOpen(false)} 
         initialData={site}
         profile={profile}
         initialTab={initialModalTab}

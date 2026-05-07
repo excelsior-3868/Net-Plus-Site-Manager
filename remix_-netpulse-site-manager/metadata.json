@@ -1,0 +1,6 @@
+{
+  "name": "Remix: NetPulse Site Manager",
+  "description": "A modern, sleek dashboard for managing BTS/eNodeB network site information with secure role-based access and real-time battery health monitoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
