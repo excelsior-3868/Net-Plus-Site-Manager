@@ -26,10 +26,12 @@ import SiteFormModal from '../components/SiteFormModal';
 import ComplaintFormModal from '../components/ComplaintFormModal';
 import { getSiteComplaints, createComplaint, updateComplaint } from '../services/complaintService';
 import { Complaint } from '../types';
+import { useToast } from '../components/Toast';
 
 export default function SiteDetail({ profile }: { profile: UserProfile | null }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
@@ -76,26 +78,20 @@ export default function SiteDetail({ profile }: { profile: UserProfile | null })
 
   const handleConfirmDelete = async () => {
     if (!site?.id) {
-       alert("Target Identification Failure: Could not resolve the unique ID for this record.");
-       return;
+      toast.error('Identification Error', 'Could not resolve the unique ID for this record.');
+      return;
     }
     
-    if (window.confirm("CRITICAL PROTOCOL: Are you sure you want to permanently DESTRUCT this asset record from the production registry? This action is irreversible.")) {
-      try {
-        await deleteSite(site.id);
-        alert("Success: Asset record has been purged from the database.");
-        navigate('/nodes');
-      } catch (error: any) {
-        console.error("Deletion execution failed:", error);
-        let errorMessage = "Check administrative authorization and connection stability.";
-        try {
-          const errStatus = error.message ? JSON.parse(error.message) : (typeof error === 'string' ? JSON.parse(error) : error);
-          errorMessage = errStatus.error || errorMessage;
-        } catch {
-          errorMessage = error.message || String(error);
-        }
-        alert(`Deletion Access Denied: ${errorMessage}`);
-      }
+    if (!window.confirm('Are you sure you want to permanently delete this site record? This action is irreversible.')) return;
+
+    try {
+      await deleteSite(site.id);
+      toast.success('Site Deleted', 'The asset record has been purged from the registry.');
+      navigate('/nodes');
+    } catch (error: any) {
+      console.error('Deletion execution failed:', error);
+      const msg = (() => { try { return JSON.parse(error.message)?.error; } catch { return error.message; } })();
+      toast.error('Delete Failed', msg || 'Check authorization and connection stability.');
     }
   };
 

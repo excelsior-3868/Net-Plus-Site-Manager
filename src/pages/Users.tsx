@@ -4,10 +4,12 @@ import { cn } from '../lib/utils';
 import { Shield, ShieldAlert, ShieldCheck, Trash2, Mail, Calendar, User as UserIcon, Users as UsersIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getCurrentUser } from '../services/authService';
+import { useToast } from '../components/Toast';
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api';
 
 export default function Users() {
+  const toast = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const currentUser = getCurrentUser();
@@ -44,16 +46,17 @@ export default function Users() {
 
   const deleteUser = async (uid: string) => {
     if (uid === currentUser?.uid) {
-      alert("You cannot delete your own account.");
+      toast.warning('Action Blocked', 'You cannot delete your own account.');
       return;
     }
-    if (window.confirm('Remove this user access?')) {
-      try {
-        await fetch(`${API_URL}/users/${uid}`, { method: 'DELETE' });
-        setUsers(users.filter(u => u.uid !== uid));
-      } catch (error) {
-        console.error('Error deleting user:', error);
-      }
+    if (!window.confirm('Remove this user\'s access?')) return;
+    try {
+      await fetch(`${API_URL}/users/${uid}`, { method: 'DELETE' });
+      setUsers(users.filter(u => u.uid !== uid));
+      toast.success('User Removed', 'User access has been revoked.');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Delete Failed', 'An error occurred while removing the user.');
     }
   };
 

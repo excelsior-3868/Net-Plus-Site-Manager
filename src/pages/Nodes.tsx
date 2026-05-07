@@ -33,12 +33,14 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import SiteFormModal from '../components/SiteFormModal';
 import ComplaintFormModal from '../components/ComplaintFormModal';
 import BulkImportPreviewModal from '../components/BulkImportPreviewModal';
+import { useToast } from '../components/Toast';
 
 interface SitesProps {
   profile: UserProfile | null;
 }
 
 export default function Sites({ profile }: SitesProps) {
+  const toast = useToast();
   const [sites, setSites] = useState<Site[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [search, setSearch] = useState('');
@@ -158,7 +160,7 @@ export default function Sites({ profile }: SitesProps) {
 
   const handleGenerateReport = () => {
     if (filteredSites.length === 0) {
-      alert("No data available to generate a report.");
+      toast.warning('No Data', 'No sites match the current filter to generate a report.');
       return;
     }
 
@@ -461,7 +463,17 @@ export default function Sites({ profile }: SitesProps) {
 
       setPreviewModalOpen(false);
       setImporting(false);
-      alert(`Import completed: ${successCount} sites added.\n${failedRows.length > 0 ? `Failed: ${failedRows.join(', ')}` : ''}`);
+      if (successCount > 0) {
+        toast.success(
+          `Import Successful`,
+          `${successCount} site${successCount > 1 ? 's' : ''} added to the registry.${failedRows.length > 0 ? ` ${failedRows.length} failed.` : ''}`
+        );
+      } else if (failedRows.length > 0) {
+        toast.error(
+          'Import Failed',
+          `All ${failedRows.length} record${failedRows.length > 1 ? 's' : ''} failed to import. Check server logs.`
+        );
+      }
       getSites(setSites);
     };
 
@@ -497,12 +509,13 @@ export default function Sites({ profile }: SitesProps) {
   };
 
   const handleConfirmDelete = async (id: string) => {
-    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this asset record? This cannot be undone.")) {
-      try {
-        await deleteSite(id);
-      } catch (error) {
-        console.error("Delete failed", error);
-      }
+    if (!window.confirm("Are you sure you want to permanently delete this asset record? This cannot be undone.")) return;
+    try {
+      await deleteSite(id);
+      toast.success('Record Deleted', 'The asset has been purged from the registry.');
+    } catch (error: any) {
+      console.error("Delete failed", error);
+      toast.error('Delete Failed', error.message || 'An error occurred during deletion.');
     }
   };
 

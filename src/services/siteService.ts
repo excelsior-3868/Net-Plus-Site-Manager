@@ -24,37 +24,36 @@ export const getSite = async (id: string) => {
 };
 
 export const createSite = async (site: Partial<Site>) => {
-  try {
-    const response = await fetch(`${API_URL}/sites`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(site),
-    });
-    const data = await response.json();
-    return data.id;
-  } catch (error) {
-    console.error('Error creating site:', error);
+  const response = await fetch(`${API_URL}/sites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(site),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Server error: ${response.status}`);
   }
+  return data.id;
 };
 
 export const updateSite = async (id: string, site: Partial<Site>) => {
-  try {
-    await fetch(`${API_URL}/sites/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(site),
-    });
-  } catch (error) {
-    console.error(`Error updating site ${id}:`, error);
+  const response = await fetch(`${API_URL}/sites/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(site),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Server error: ${response.status}`);
   }
 };
 
 export const deleteSite = async (id: string) => {
-  try {
-    await fetch(`${API_URL}/sites/${id}`, {
-      method: 'DELETE',
-    });
-  } catch (error) {
-    console.error(`Error deleting site ${id}:`, error);
+  const response = await fetch(`${API_URL}/sites/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Server error: ${response.status}`);
   }
 };

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getCurrentUser } from './services/authService';
 import { UserProfile } from './types';
+import { ToastProvider } from './components/Toast';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -36,26 +37,28 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={!profile ? <Login /> : <Navigate to="/" replace />} />
-        
-        <Route element={profile ? <Layout profile={profile} /> : <Navigate to="/login" replace />}>
-          <Route path="/" element={<Dashboard profile={profile} />} />
-          <Route path="/provincial" element={<ProvincialDashboard profile={profile} />} />
-          <Route path="/transmission-registry" element={<Nodes profile={profile} />} />
-          <Route path="/nodes" element={<Nodes profile={profile} />} />
-          <Route path="/solar-stations" element={<Nodes profile={profile} />} />
-          <Route path="/planned-sites" element={<Nodes profile={profile} />} />
-          <Route path="/site-complaints" element={<Nodes profile={profile} />} />
-          <Route path="/complaints" element={<Complaints profile={profile} />} />
-          <Route path="/complaints/map" element={<ComplaintMap profile={profile} />} />
-          <Route path="/sites/:id" element={<SiteDetail profile={profile} />} />
-          <Route path="/users" element={(profile?.role === 'admin' || profile?.role === 'superadmin') ? <Users /> : <Navigate to="/" replace />} />
-        </Route>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={!profile ? <Login /> : <Navigate to="/" replace />} />
+          
+          <Route element={profile ? <Layout profile={profile} /> : <Navigate to="/login" replace />}>
+            <Route path="/" element={<Dashboard profile={profile} />} />
+            <Route path="/provincial" element={<ProvincialDashboard profile={profile} />} />
+            <Route path="/transmission-registry" element={<Nodes profile={profile} />} />
+            <Route path="/nodes" element={<Nodes profile={profile} />} />
+            <Route path="/solar-stations" element={<Nodes profile={profile} />} />
+            <Route path="/planned-sites" element={<Nodes profile={profile} />} />
+            <Route path="/site-complaints" element={<Nodes profile={profile} />} />
+            <Route path="/complaints" element={<Complaints profile={profile} />} />
+            <Route path="/complaints/map" element={<ComplaintMap profile={profile} />} />
+            <Route path="/sites/:id" element={<SiteDetail profile={profile} />} />
+            <Route path="/users" element={(profile?.role === 'admin' || profile?.role === 'superadmin') ? <Users /> : <Navigate to="/" replace />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
